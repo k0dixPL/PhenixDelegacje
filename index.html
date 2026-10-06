@@ -470,6 +470,55 @@ input::placeholder { color: var(--fg-dim); }
 }
 #toast[hidden] { display: none !important; }
 
+/* === LOCATION SHORTCUTS === */
+.locations-bar {
+  margin-bottom: 14px;
+  flex-shrink: 0;
+}
+
+.locations-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+.locations-scroll::-webkit-scrollbar { display: none; }
+
+.loc-chip {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 12px; font-weight: 600; color: var(--fg-muted);
+  cursor: pointer; white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+.loc-chip:hover, .loc-chip.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-bg);
+}
+.loc-chip-add {
+  border-style: dashed;
+  color: var(--fg-dim);
+}
+.loc-chip-add:hover { color: var(--accent); }
+
+.loc-chip-del {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--fg-dim);
+  font-size: 14px; line-height: 1;
+  margin-left: 2px;
+  transition: color 0.15s, background 0.15s;
+}
+.loc-chip:hover .loc-chip-del { color: var(--red); }
+
 /* === CITY EDIT MODAL === */
 .modal-overlay {
   position: fixed; inset: 0;
@@ -594,6 +643,13 @@ input::placeholder { color: var(--fg-dim); }
       <button class="btn-city-edit" id="btn-edit-city">Zmień</button>
     </div>
 
+    <!-- Location shortcuts (baza obiektów) -->
+    <div class="locations-bar" id="locations-bar">
+      <div class="locations-scroll" id="locations-scroll">
+        <!-- chips rendered by JS -->
+      </div>
+    </div>
+
     <!-- Status card -->
     <div class="status-card">
       <div class="status-row">
@@ -650,6 +706,18 @@ input::placeholder { color: var(--fg-dim); }
     <div class="modal-buttons">
       <button class="btn-secondary" id="btn-city-cancel">Anuluj</button>
       <button class="btn-primary" id="btn-city-confirm">Zapisz</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add location modal -->
+<div class="modal-overlay" id="loc-modal" hidden>
+  <div class="modal">
+    <h3>📌 Nowy obiekt</h3>
+    <input type="text" id="inp-loc-name" placeholder="np. Klient Wrocław, Magazyn Gdańsk…">
+    <div class="modal-buttons">
+      <button class="btn-secondary" id="btn-loc-cancel">Anuluj</button>
+      <button class="btn-primary" id="btn-loc-confirm">Dodaj</button>
     </div>
   </div>
 </div>
@@ -798,6 +866,9 @@ function showMain() {
   } else {
     detectCity();
   }
+
+  // Location shortcuts
+  renderLocationChips();
 
   // Load today's invoices
   state.todayInvoices = lsJ('today_invoices_' + todayKey()) || [];
@@ -1117,6 +1188,165 @@ if (savedStart) {
     }, 100);
   }
 }
+
+// ---- Location shortcuts — shared via Google Sheets tab "Obiekty" ----
+// Local cache key: 'locations_cache' — used when offline or token expired
+const SHEET_LOCATIONS = 'Obiekty';
+
+async function fetchLocations() {
+  // Try Sheets first; fall back to local cache
+  if (state.sheetId && state.accessToken) {
+    try {
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_LOCATIONS)}!A:A`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${state.accessToken}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const rows = (data.values || []).flat().filter(Boolean);
+        ls('locations_cache', rows);
+        return rows;
+      }
+    } catch(e) { /* offline — use cache */ }
+  }
+  return lsJ('locations_cache') || [];
+}
+
+async function renderLocationChips() {
+  const scroll = document.getElementById('locations-scroll');
+  if (!scroll) return;
+
+  // Show spinner while loading
+  scroll.innerHTML = '<span style="color:var(--fg-dim);font-size:12px;padding:6px 4px">⏳</span>';
+
+  const locs = await fetchLocations();
+  scroll.innerHTML = '';
+
+  locs.forEach(name => {
+    const chip = document.createElement('button');
+    chip.className = 'loc-chip' + (state.city === name ? ' active' : '');
+    chip.innerHTML = `<span>📌</span>${esc(name)}<span class="loc-chip-del" data-name="${esc(name)}" title="Usuń">×</span>`;
+    chip.addEventListener('click', (e) => {
+      if (e.target.classList.contains('loc-chip-del')) {
+        deleteLocation(e.target.dataset.name);
+      } else {
+        selectLocation(name);
+      }
+    });
+    scroll.appendChild(chip);
+  });
+
+  // "+ Dodaj obiekt" chip
+  const addChip = document.createElement('button');
+  addChip.className = 'loc-chip loc-chip-add';
+  addChip.innerHTML = '＋ Dodaj obiekt';
+  addChip.addEventListener('click', () => openLocModal());
+  scroll.appendChild(addChip);
+}
+
+function selectLocation(name) {
+  state.city = name;
+  ls('saved_city', name);
+  document.getElementById('city-label').textContent = name;
+  renderLocationChips();
+  showToast('📌 ' + name);
+}
+
+async function deleteLocation(name) {
+  // Find row number in sheet (1-indexed)
+  const cache = lsJ('locations_cache') || [];
+  const rowIdx = cache.findIndex(n => n === name);
+  if (rowIdx === -1) { renderLocationChips(); return; }
+  const sheetRow = rowIdx + 1; // Sheets rows are 1-indexed
+
+  // Optimistic local update
+  const updated = cache.filter(n => n !== name);
+  ls('locations_cache', updated);
+  renderLocationChips();
+
+  if (state.sheetId && state.accessToken) {
+    try {
+      // Clear that row (batchClear)
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values:batchClear`;
+      await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${state.accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ ranges: [`${SHEET_LOCATIONS}!A${sheetRow}`] })
+      });
+      // Reload fresh (gaps from clearing get handled by re-fetch)
+      // Re-write entire column to avoid empty rows
+      const cleanUrl = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_LOCATIONS)}!A:A?valueInputOption=RAW`;
+      await fetch(cleanUrl.replace('?', ':clear?').replace('A:A?', 'A:A'), {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${state.accessToken}`, 'Content-Type': 'application/json' }
+      });
+      // Write clean list back
+      const writeUrl = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_LOCATIONS)}!A1?valueInputOption=RAW`;
+      await fetch(writeUrl, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${state.accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values: updated.map(n => [n]) })
+      });
+    } catch(e) {
+      showToast('⚠️ Błąd usuwania z arkusza');
+    }
+  }
+}
+
+async function addLocationToSheet(name) {
+  // Optimistic local update
+  const cache = lsJ('locations_cache') || [];
+  if (cache.some(n => n.toLowerCase() === name.toLowerCase())) return false; // duplicate
+  cache.push(name);
+  ls('locations_cache', cache);
+
+  if (state.sheetId && state.accessToken) {
+    try {
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_LOCATIONS)}!A:A:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`;
+      await fetch(url, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${state.accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values: [[name]] })
+      });
+    } catch(e) {
+      showToast('⚠️ Błąd zapisu do arkusza — obiekt zapisany lokalnie');
+    }
+  }
+  return true;
+}
+
+function openLocModal() {
+  document.getElementById('inp-loc-name').value = '';
+  document.getElementById('loc-modal').hidden = false;
+  document.getElementById('inp-loc-name').focus();
+}
+
+document.getElementById('btn-loc-cancel').addEventListener('click', () => {
+  document.getElementById('loc-modal').hidden = true;
+});
+
+document.getElementById('btn-loc-confirm').addEventListener('click', async () => {
+  const name = document.getElementById('inp-loc-name').value.trim();
+  if (!name) { showToast('Wpisz nazwę obiektu'); return; }
+  document.getElementById('loc-modal').hidden = true;
+  const ok = await addLocationToSheet(name);
+  if (ok === false) { showToast('Obiekt już istnieje'); return; }
+  renderLocationChips();
+  showToast('✓ Dodano: ' + name);
+});
+
+document.getElementById('inp-loc-name').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btn-loc-confirm').click();
+});
+
+document.getElementById('loc-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('loc-modal')) {
+    document.getElementById('loc-modal').hidden = true;
+  }
+});
 
 // ---- Start ----
 init();
