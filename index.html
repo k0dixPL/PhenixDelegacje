@@ -1204,7 +1204,7 @@ function startWork() {
   document.getElementById('tl-start').textContent = fmtTime(state.workStart);
   document.getElementById('tl-start').classList.add('active');
   document.getElementById('tl-dot').classList.add('active');
-  document.getElementById('tl-elapsed').classList.add('active');
+  document.getElementById('timer-display').classList.add('active');
 
   state.timerInterval = setInterval(updateTimer, 1000);
   updateTimer();
@@ -1248,7 +1248,6 @@ async function endWork() {
   document.getElementById('tl-start').textContent = '--:--';
   document.getElementById('tl-start').classList.remove('active');
   document.getElementById('tl-dot').classList.remove('active');
-  document.getElementById('tl-elapsed').classList.remove('active');
   document.getElementById('tl-fill').style.width = '0%';
   state.workStart = null;
   ls('work_start', null);
@@ -1434,7 +1433,7 @@ if (savedStart) {
         document.getElementById('tl-start').textContent = fmtTime(d);
         document.getElementById('tl-start').classList.add('active');
         document.getElementById('tl-dot').classList.add('active');
-        document.getElementById('tl-elapsed').classList.add('active');
+        document.getElementById('timer-display').classList.add('active');
         state.timerInterval = setInterval(updateTimer, 1000);
         updateTimer();
       }
