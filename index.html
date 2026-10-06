@@ -2232,22 +2232,59 @@ function initDocsScreen() {
   // Build employee selects
   buildEmployeeSelect('del-employee');
   buildEmployeeSelect('url-employee');
+  // Odśwież listę z arkusza w tle
+  fetchEmployees().then(() => {
+    buildEmployeeSelect('del-employee');
+    buildEmployeeSelect('url-employee');
+  });
   // Build city select for delegacja
   buildCitySelect();
   // Auto-set today for urlop submission
   document.getElementById('url-submission').value = fridayBefore(new Date());
 }
 
+// Pracownicy — zakładka "Pracownicy" w arkuszu (A=Imię i nazwisko, B=Stanowisko, C=Email)
+const SHEET_EMPLOYEES = 'Pracownicy';
+
+async function fetchEmployees() {
+  if (!state.sheetId || !state.accessToken) return;
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_EMPLOYEES)}!A:C`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${state.accessToken}` } });
+    if (!res.ok) return;
+    const rows = ((await res.json()).values || [])
+      .filter(r => r[0] && r[0].trim() && r[0].trim().toLowerCase() !== 'imię i nazwisko' && r[0].trim().toLowerCase() !== 'imie i nazwisko')
+      .map(r => ({ name: r[0].trim(), position: (r[1] || 'Instalator').trim(), email: (r[2] || '').trim().toLowerCase() }));
+    if (rows.length) ls('employees_cache', rows);
+  } catch(e) { /* offline — zostaje cache */ }
+}
+
+function getEmployees() {
+  const cached = lsJ('employees_cache');
+  const list = (cached && cached.length ? cached : DOC_EMPLOYEES).slice();
+  // Zalogowany użytkownik zawsze na liście
+  if (state.user && state.user.name && !list.some(e =>
+      (e.email && e.email === (state.user.email || '').toLowerCase()) ||
+      e.name.toLowerCase() === state.user.name.toLowerCase())) {
+    list.push({ name: state.user.name, position: 'Instalator', email: (state.user.email || '').toLowerCase() });
+  }
+  return list;
+}
+
 function buildEmployeeSelect(id) {
   const sel = document.getElementById(id);
-  sel.innerHTML = DOC_EMPLOYEES.map(e =>
+  const prev = sel.value;
+  const emps = getEmployees();
+  sel.innerHTML = emps.map(e =>
     `<option value="${esc(e.name)}" data-pos="${esc(e.position)}">${esc(e.name)} — ${esc(e.position)}</option>`
   ).join('');
-  // Pre-select logged-in user
-  if (state.user && state.user.name) {
-    const match = DOC_EMPLOYEES.findIndex(e => e.name.toLowerCase() === state.user.name.toLowerCase());
-    if (match >= 0) sel.selectedIndex = match;
+  let idx = -1;
+  if (prev) idx = emps.findIndex(e => e.name === prev);
+  if (idx < 0 && state.user) {
+    const mail = (state.user.email || '').toLowerCase();
+    idx = emps.findIndex(e => (e.email && e.email === mail) || e.name.toLowerCase() === (state.user.name || '').toLowerCase());
   }
+  if (idx >= 0) sel.selectedIndex = idx;
 }
 
 function buildCitySelect() {
