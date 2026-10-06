@@ -1318,6 +1318,13 @@ function saveHistory(row) {
   ls('history', hist.slice(0, 50));
 }
 
+function deleteHistoryEntry(i) {
+  const hist = lsJ('history') || [];
+  hist.splice(i, 1);
+  ls('history', hist);
+  renderHistory();
+}
+
 function renderHistory() {
   const list = document.getElementById('history-list');
   const hist = lsJ('history') || [];
@@ -1325,7 +1332,7 @@ function renderHistory() {
     list.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><p>Brak wpisów. Zacznij od przycisku START.</p></div>';
     return;
   }
-  list.innerHTML = hist.map(r => `
+  list.innerHTML = hist.map((r, i) => `
     <div class="history-entry">
       <div class="history-top">
         <div class="history-person">
@@ -1333,7 +1340,10 @@ function renderHistory() {
           ${esc(r.person)}
           <span class="history-city">· ${esc(r.city)}</span>
         </div>
-        <span class="history-time">${esc(r.date)}</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="history-time">${esc(r.date)}</span>
+          <button onclick="deleteHistoryEntry(${i})" title="Usuń wpis" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:0;line-height:1;opacity:0.5" onmouseover="this.style.opacity='1';this.style.color='var(--red)'" onmouseout="this.style.opacity='0.5';this.style.color='var(--muted)'">✕</button>
+        </div>
       </div>
       <div class="history-bottom">
         <span class="history-hours">${esc(r.start)} → ${esc(r.end)} (${esc(r.hours)})</span>
