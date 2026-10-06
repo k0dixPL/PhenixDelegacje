@@ -1427,7 +1427,10 @@ async function fetchLocations() {
       const res = await fetch(url, { headers: { Authorization: `Bearer ${state.accessToken}` } });
       if (res.ok) {
         const data = await res.json();
-        const rows = (data.values || [])
+        const allRows = (data.values || []);
+        // Skip header row if first cell is literally "Nazwa"
+        const dataRows = (allRows[0] && allRows[0][0] === 'Nazwa') ? allRows.slice(1) : allRows;
+        const rows = dataRows
           .filter(r => r[0] && r[0].trim())
           .map(r => ({ name: r[0].trim(), city: (r[1] || '').trim() }));
         ls('locations_cache', rows);
