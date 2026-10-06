@@ -897,7 +897,9 @@ input::placeholder { color: var(--fg-dim); }
     </div>
     <div class="inp-wrap" style="margin-bottom:12px">
       <label style="font-size:11px;color:var(--fg-muted);display:block;margin-bottom:4px">Obiekt / Miasto</label>
-      <input type="text" id="inp-manual-city" placeholder="np. Warszawa, Magazyn Łódź…">
+      <select id="inp-manual-city" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface2);color:var(--fg);font-family:var(--font-body);font-size:14px;appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%228%22 viewBox=%220 0 12 8%22><path d=%22M1 1l5 5 5-5%22 stroke=%22%237A8BA8%22 stroke-width=%221.5%22 fill=%22none%22 stroke-linecap=%22round%22/></svg>');background-repeat:no-repeat;background-position:right 12px center;padding-right:32px">
+        <option value="">— wybierz obiekt —</option>
+      </select>
     </div>
     <div style="display:flex;gap:10px;margin-bottom:12px">
       <div class="inp-wrap" style="flex:1">
@@ -1481,12 +1483,15 @@ async function renderLocationChips() {
   const locs = await fetchLocations();
   bar.innerHTML = '';
 
-  // Group by city
-  const cities = {};
+  // Group by INITIAL LETTER → { cities → [objects] }, alphabetically
+  // Structure: initials['W'] = { 'Warszawa': ['NSA','PGF'], 'Wieruszów': ['Woodeco'] }
+  const byInitial = {};
   locs.forEach(loc => {
     const c = loc.city || '?';
-    if (!cities[c]) cities[c] = [];
-    cities[c].push(loc.name);
+    const initial = c[0].toUpperCase();
+    if (!byInitial[initial]) byInitial[initial] = {};
+    if (!byInitial[initial][c]) byInitial[initial][c] = [];
+    byInitial[initial][c].push(loc.name);
   });
 
   // Close all dropdowns helper
@@ -1494,65 +1499,78 @@ async function renderLocationChips() {
     bar.querySelectorAll('.city-dropdown').forEach(d => d.classList.remove('open'));
     bar.querySelectorAll('.city-initial-btn').forEach(b => b.classList.remove('open'));
   }
+  // one global listener, not added repeatedly
+  if (!bar._closeAllAttached) {
+    bar._closeAllAttached = true;
+    document.addEventListener('click', e => {
+      if (!bar.contains(e.target)) closeAll();
+    });
+  }
 
-  Object.entries(cities).forEach(([city, names]) => {
-    const initial = city[0].toUpperCase();
-    const hasActive = names.includes(state.city);
+  // Sort initials alphabetically
+  Object.keys(byInitial).sort().forEach(initial => {
+    const citiesMap = byInitial[initial]; // { cityName: [objNames] }
+    // Check if any object under this initial is the active city
+    const hasActive = Object.values(citiesMap).some(names => names.includes(state.city));
 
-    // Wrapper (positioned) for button + dropdown
     const wrap = document.createElement('div');
     wrap.style.position = 'relative';
 
-    // City initial button
     const btn = document.createElement('button');
     btn.className = 'city-initial-btn' + (hasActive ? ' has-active' : '');
-    btn.title = city;
     btn.textContent = initial;
+    // Tooltip: list cities under this letter
+    btn.title = Object.keys(citiesMap).sort().join(', ');
 
-    // Dropdown panel
     const drop = document.createElement('div');
     drop.className = 'city-dropdown';
 
-    // City label header
-    const hdr = document.createElement('div');
-    hdr.className = 'city-dropdown-title';
-    hdr.textContent = city;
-    drop.appendChild(hdr);
-
-    // Object items
-    names.forEach(name => {
-      const item = document.createElement('div');
-      item.className = 'obj-item' + (state.city === name ? ' active' : '');
-      item.innerHTML = `<span class="obj-item-name">${esc(name)}</span><button class="obj-item-del" title="Usuń">×</button>`;
-      item.querySelector('.obj-item-name').addEventListener('click', () => {
-        selectLocation(name);
-        closeAll();
-      });
-      item.querySelector('.obj-item-del').addEventListener('click', e => {
+    // For each city under this initial, sorted alphabetically
+    Object.keys(citiesMap).sort().forEach(cityName => {
+      // City sub-header
+      const cityHdr = document.createElement('div');
+      cityHdr.className = 'city-dropdown-title';
+      cityHdr.style.cssText = 'margin-top:6px;border-top:1px solid var(--border);padding-top:6px;';
+      cityHdr.innerHTML = `${esc(cityName)} <button class="obj-add-btn" style="display:inline-flex;width:auto;padding:1px 8px;font-size:11px;margin-left:auto" data-city="${esc(cityName)}">＋</button>`;
+      cityHdr.style.display = 'flex';
+      cityHdr.style.alignItems = 'center';
+      cityHdr.querySelector('button').addEventListener('click', e => {
         e.stopPropagation();
-        deleteLocation(name, city);
+        closeAll();
+        openLocModal(cityName);
       });
-      drop.appendChild(item);
+      drop.appendChild(cityHdr);
+
+      // Objects in this city, sorted alphabetically
+      [...citiesMap[cityName]].sort().forEach(name => {
+        const item = document.createElement('div');
+        item.className = 'obj-item' + (state.city === name ? ' active' : '');
+        item.innerHTML = `<span class="obj-item-name">${esc(name)}</span><button class="obj-item-del" title="Usuń">×</button>`;
+        item.querySelector('.obj-item-name').addEventListener('click', () => {
+          selectLocation(name);
+          closeAll();
+        });
+        item.querySelector('.obj-item-del').addEventListener('click', e => {
+          e.stopPropagation();
+          deleteLocation(name, cityName);
+        });
+        drop.appendChild(item);
+      });
     });
 
-    // "Dodaj obiekt" in this city
-    const addBtn = document.createElement('button');
-    addBtn.className = 'obj-add-btn';
-    addBtn.textContent = '＋ Dodaj obiekt';
-    addBtn.addEventListener('click', () => {
-      closeAll();
-      openLocModal(city);
-    });
-    drop.appendChild(addBtn);
+    // "Dodaj nowe miasto" at bottom of dropdown
+    const newCityBtn = document.createElement('button');
+    newCityBtn.className = 'obj-add-btn';
+    newCityBtn.style.marginTop = '6px';
+    newCityBtn.textContent = '＋ Nowe miasto…';
+    newCityBtn.addEventListener('click', () => { closeAll(); openLocModal(''); });
+    drop.appendChild(newCityBtn);
 
-    btn.addEventListener('click', (e) => {
+    btn.addEventListener('click', e => {
       e.stopPropagation();
       const isOpen = drop.classList.contains('open');
       closeAll();
-      if (!isOpen) {
-        drop.classList.add('open');
-        btn.classList.add('open');
-      }
+      if (!isOpen) { drop.classList.add('open'); btn.classList.add('open'); }
     });
 
     wrap.appendChild(btn);
@@ -1560,20 +1578,44 @@ async function renderLocationChips() {
     bar.appendChild(wrap);
   });
 
-  // "+ Nowe miasto" button (always present)
+  // "+" button — add new object/city
   const newBtn = document.createElement('button');
   newBtn.className = 'city-initial-btn';
-  newBtn.title = 'Dodaj nowy obiekt';
   newBtn.innerHTML = '＋';
   newBtn.style.fontSize = '16px';
-  newBtn.addEventListener('click', () => {
-    closeAll();
-    openLocModal('');
-  });
+  newBtn.title = 'Dodaj nowy obiekt';
+  newBtn.addEventListener('click', e => { e.stopPropagation(); closeAll(); openLocModal(''); });
   bar.appendChild(newBtn);
 
-  // Click outside closes all
-  document.addEventListener('click', closeAll, { once: false });
+  // Also refresh the manual modal select
+  refreshManualSelect(locs);
+}
+
+function refreshManualSelect(locs) {
+  const sel = document.getElementById('inp-manual-city');
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— wybierz obiekt —</option>';
+  // Group by city, sort both
+  const byCity = {};
+  (locs || []).forEach(l => {
+    const c = l.city || '?';
+    if (!byCity[c]) byCity[c] = [];
+    byCity[c].push(l.name);
+  });
+  Object.keys(byCity).sort().forEach(city => {
+    const grp = document.createElement('optgroup');
+    grp.label = city;
+    [...byCity[city]].sort().forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      grp.appendChild(opt);
+    });
+    sel.appendChild(grp);
+  });
+  // restore previous selection if still valid
+  if (prev) sel.value = prev;
 }
 
 function selectLocation(name) {
@@ -1675,14 +1717,17 @@ document.getElementById('loc-modal').addEventListener('click', e => {
 });
 
 // ---- Manual entry ----
-document.getElementById('btn-open-manual').addEventListener('click', () => {
+document.getElementById('btn-open-manual').addEventListener('click', async () => {
   const today = new Date().toISOString().substring(0, 10);
   document.getElementById('inp-manual-date').value = today;
-  document.getElementById('inp-manual-city').value = state.city || '';
   document.getElementById('inp-manual-start').value = '';
   document.getElementById('inp-manual-end').value = '';
   document.getElementById('inp-manual-amount').value = '';
   document.getElementById('inp-manual-desc').value = '';
+  // Refresh location list and pre-select current city
+  const locs = await fetchLocations();
+  refreshManualSelect(locs);
+  if (state.city) document.getElementById('inp-manual-city').value = state.city;
   document.getElementById('manual-modal').hidden = false;
 });
 
