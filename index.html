@@ -1015,6 +1015,7 @@ input::placeholder { color: var(--fg-dim); }
     <div class="doc-subtabs">
       <button class="doc-subtab active" id="subtab-delegacja" onclick="showDocSubtab('delegacja')">✈ Delegacja</button>
       <button class="doc-subtab" id="subtab-urlop" onclick="showDocSubtab('urlop')">🌴 Urlop</button>
+      <button class="doc-subtab" id="subtab-raport" onclick="showDocSubtab('raport')">📊 Raport</button>
     </div>
 
     <!-- Delegacja sub-screen -->
@@ -1099,6 +1100,30 @@ input::placeholder { color: var(--fg-dim); }
           </div>
         </div>
         <button class="btn-generate" onclick="generateUrlop()">Generuj wniosek</button>
+      </div>
+    </div>
+
+    <!-- Raport sub-screen -->
+    <div id="doc-raport" style="display:none">
+      <p class="section-title">Raport czasu pracy</p>
+      <div class="doc-form">
+        <div class="doc-field">
+          <label>Pracownik</label>
+          <select id="rep-employee"></select>
+        </div>
+        <div class="doc-field">
+          <label>Okres</label>
+          <select id="rep-period">
+            <option value="week">Tydzień</option>
+            <option value="month">Miesiąc</option>
+          </select>
+        </div>
+        <div class="doc-field">
+          <label id="rep-date-label">Dowolny dzień z okresu</label>
+          <input type="date" id="rep-date">
+        </div>
+        <button class="btn-generate" onclick="generateReport()">Generuj raport</button>
+        <button class="btn-generate" style="background:var(--surface2);color:var(--fg-muted);border:1.5px solid var(--border)" onclick="copyTeamLink()">🔗 Kopiuj link konfiguracji dla zespołu</button>
       </div>
     </div>
 
@@ -1270,9 +1295,24 @@ function lsJ(key) {
 }
 
 // ---- Init ----
+// Ewentualne stałe domyślne (wpisz raz, a nikt nie musi konfigurować):
+const DEFAULT_SHEET_ID = '';
+const DEFAULT_CLIENT_ID = '';
+
 function init() {
-  state.sheetId = ls('cfg_sheet_id') || '';
-  state.clientId = ls('cfg_client_id') || '';
+  // Konfiguracja z linku ?sid=...&cid=... (jednorazowo zapisywana na urządzeniu)
+  const qp = new URLSearchParams(window.location.search);
+  if (qp.get('sid') && qp.get('cid')) {
+    ls('cfg_sheet_id', qp.get('sid'));
+    ls('cfg_client_id', qp.get('cid'));
+    window.history.replaceState(null, '', window.location.pathname + window.location.hash);
+  }
+  state.sheetId = ls('cfg_sheet_id') || DEFAULT_SHEET_ID;
+  state.clientId = ls('cfg_client_id') || DEFAULT_CLIENT_ID;
+  // Konfiguracja gotowa — ukryj formularz
+  if (state.sheetId && state.clientId) {
+    document.getElementById('config-overlay').style.display = 'none';
+  }
   state.city = ls('saved_city') || '';
 
   if (state.sheetId) document.getElementById('cfg-sheet-id').value = state.sheetId;
@@ -2190,9 +2230,9 @@ init();
 // ============================================================
 
 const DOC_EMPLOYEES = [
-  { name: 'Konrad Wujkowski', position: 'Instalator' },
-  { name: 'Grzegorz Ujek',    position: 'Instalator' },
-  { name: 'Emil Norejko',     position: 'Instalator' }
+  { name: 'Konrad Wujkowski', position: 'Instalator', email: 'k0dix87@gmail.com' },
+  { name: 'Grzegorz Ujek',    position: 'Instalator', email: 'ujekgrzegorz@gmail.com' },
+  { name: 'Emil Norejko',     position: 'Instalator', email: 'norejko.emil@gmail.com' }
 ];
 
 // ---- Tab switching ----
@@ -2220,6 +2260,8 @@ function showDocSubtab(sub) {
   document.getElementById('doc-urlop').style.display     = sub === 'urlop'     ? '' : 'none';
   document.getElementById('subtab-delegacja').classList.toggle('active', sub === 'delegacja');
   document.getElementById('subtab-urlop').classList.toggle('active',     sub === 'urlop');
+  document.getElementById('doc-raport').style.display    = sub === 'raport'    ? '' : 'none';
+  document.getElementById('subtab-raport').classList.toggle('active',   sub === 'raport');
 }
 
 function initDocsScreen() {
@@ -2232,10 +2274,13 @@ function initDocsScreen() {
   // Build employee selects
   buildEmployeeSelect('del-employee');
   buildEmployeeSelect('url-employee');
+  buildReportSelect();
+  if (!document.getElementById('rep-date').value) document.getElementById('rep-date').value = new Date().toISOString().substring(0, 10);
   // Odśwież listę z arkusza w tle
   fetchEmployees().then(() => {
     buildEmployeeSelect('del-employee');
     buildEmployeeSelect('url-employee');
+    buildReportSelect();
   });
   // Build city select for delegacja
   buildCitySelect();
@@ -2294,6 +2339,81 @@ function buildCitySelect() {
   sel.innerHTML = cities.length
     ? cities.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('')
     : '<option value="">— brak obiektów —</option>';
+}
+
+function buildReportSelect() {
+  const sel = document.getElementById('rep-employee');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="__all__">Wszyscy pracownicy</option>' +
+    getEmployees().map(e => `<option value="${esc(e.name)}">${esc(e.name)}</option>`).join('');
+  if (prev) sel.value = prev;
+}
+
+function reportRange(dateStr, period) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const iso = dt => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  if (period === 'week') {
+    const off = (new Date(y, m-1, d).getDay() + 6) % 7;
+    return [iso(new Date(y, m-1, d - off)), iso(new Date(y, m-1, d - off + 6))];
+  }
+  return [iso(new Date(y, m-1, 1)), iso(new Date(y, m, 0))];
+}
+
+async function generateReport() {
+  const who = document.getElementById('rep-employee').value;
+  const period = document.getElementById('rep-period').value;
+  const dateVal = document.getElementById('rep-date').value;
+  if (!dateVal) { showToast('Wybierz dzień z okresu'); return; }
+  const [from, to] = reportRange(dateVal, period);
+
+  const emps = getEmployees();
+  const people = who === '__all__' ? emps : emps.filter(e => e.name === who);
+  showToast('⏳ Pobieram dane z rejestru…');
+
+  // jedno pobranie rejestru dla wszystkich osób
+  let raw = null;
+  if (state.sheetId && state.accessToken) {
+    try {
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_REGISTER)}!A:H`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${state.accessToken}` } });
+      if (res.ok) raw = ((await res.json()).values || []);
+    } catch(e) {}
+  }
+
+  let pages = '';
+  for (const e of people) {
+    const log = await fetchWorkLog(e.email || '', e.name, from, to, raw);
+    // przy braku emaila w zakładce Pracownicy nie da się dopasować wpisów z arkusza
+    pages += `<div class="prep">
+      <h2>RAPORT CZASU PRACY</h2>
+      <p class="sub">${fmtDocDate(from)} – ${fmtDocDate(to)}</p>
+      <table><tr><th style="width:40%">Pracownik</th><td>${esc(e.name)}</td></tr>
+      <tr><th>Stanowisko</th><td>${esc(e.position)}</td></tr></table>
+      ${buildLogTable(log)}
+      <p class="small right" style="margin-top:6px">Phenix-IT Sp. z o.o. | Drukowano: ${new Date().toLocaleDateString('pl-PL')}</p>
+    </div>`;
+  }
+  const css = `<style>
+    .prep { font-family: Arial, sans-serif; font-size: 12px; color: #000; page-break-after: always; margin-bottom: 32px; }
+    .prep:last-child { page-break-after: auto; }
+    .prep h2 { text-align: center; font-size: 16px; margin-bottom: 4px; }
+    .prep .sub { text-align: center; font-size: 13px; margin-bottom: 16px; color: #333; }
+    .prep table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+    .prep td, .prep th { border: 1px solid #000; padding: 4px 6px; vertical-align: top; }
+    .prep th { background: #f0f0f0; text-align: left; font-weight: 600; }
+    .prep .center { text-align: center; } .prep .right { text-align: right; } .prep .small { font-size: 11px; color: #555; }
+  </style>`;
+  document.getElementById('print-delegacja-content').innerHTML = css + (pages || '<p>Brak pracowników.</p>');
+  document.getElementById('print-delegacja-overlay').style.display = 'block';
+}
+
+function teamLink() {
+  return `${location.origin}${location.pathname}?sid=${encodeURIComponent(state.sheetId)}&cid=${encodeURIComponent(state.clientId)}`;
+}
+async function copyTeamLink() {
+  if (!state.sheetId || !state.clientId) { showToast('Brak konfiguracji na tym urządzeniu'); return; }
+  try { await navigator.clipboard.writeText(teamLink()); showToast('✓ Link skopiowany — wyślij zespołowi'); }
+  catch(e) { prompt('Skopiuj link:', teamLink()); }
 }
 
 // ---- Helpers ----
@@ -2357,9 +2477,9 @@ function toMin(t) {
   return m ? (+m[1]) * 60 + (+m[2]) : null;
 }
 
-async function fetchWorkLog(email, name, from, to) {
-  let raw = null, source = 'rejestr Google Sheets';
-  if (state.sheetId && state.accessToken) {
+async function fetchWorkLog(email, name, from, to, prefetched) {
+  let raw = prefetched || null, source = 'rejestr Google Sheets';
+  if (!raw && state.sheetId && state.accessToken) {
     try {
       const url = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_REGISTER)}!A:H`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${state.accessToken}` } });
@@ -2372,7 +2492,7 @@ async function fetchWorkLog(email, name, from, to) {
     for (const r of raw) {
       const iso = parseRegDate(r[0]);
       if (!iso || iso < from || iso > to) continue;
-      if (email ? (String(r[5] || '').trim().toLowerCase() !== email) : false) continue;
+      if (!email || String(r[5] || '').trim().toLowerCase() !== email) continue;
       const s0 = toMin(r[3]), e0 = toMin(r[4]);
       rows.push({
         iso, obj: r[1] || '', city: r[2] || '', start: r[3] || '', end: r[4] || '',
@@ -2400,6 +2520,29 @@ async function fetchWorkLog(email, name, from, to) {
   return { rows, source };
 }
 
+function buildLogTable(log) {
+  const fmtHM = m => `${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}`;
+  const fmtMoney = v => v.toFixed(2).replace('.', ',');
+  const totalMin = log.rows.reduce((a, r) => a + r.min, 0);
+  const totalCost = log.rows.reduce((a, r) => a + r.cost, 0);
+  const logRows = log.rows.length
+    ? log.rows.map((r, i) => `<tr>
+        <td class="center">${i+1}</td><td>${fmtDocDate(r.iso)}</td><td>${esc(r.obj)}</td><td>${esc(r.city)}</td>
+        <td class="center">${esc(r.start)}</td><td class="center">${esc(r.end)}</td>
+        <td class="center">${fmtHM(r.min)}</td><td class="right">${r.cost ? fmtMoney(r.cost) : ''}</td>
+        <td>${esc(r.note)}</td></tr>`).join('')
+    : '<tr><td colspan="9" class="center">Brak wpisów w rejestrze w tym zakresie</td></tr>';
+  return `
+  <p style="font-size:13px;font-weight:700;margin-bottom:8px">Ewidencja czasu pracy (${log.source})</p>
+  <table>
+    <tr><th>Lp.</th><th>Data</th><th>Obiekt</th><th>Miasto</th><th>Wejście</th><th>Wyjście</th><th>Czas</th><th>Koszty PLN</th><th>Opis</th></tr>
+    ${logRows}
+    <tr><td colspan="6" style="text-align:right;font-weight:700">RAZEM:</td>
+      <td class="center" style="font-weight:700">${fmtHM(totalMin)}</td>
+      <td class="right" style="font-weight:700">${fmtMoney(totalCost)}</td><td></td></tr>
+  </table>`;
+}
+
 // ---- Generate Delegacja ----
 async function generateDelegacja() {
   const empSel = document.getElementById('del-employee');
@@ -2421,26 +2564,7 @@ async function generateDelegacja() {
   const empEmail = (emp && emp.email) || '';
   showToast('⏳ Pobieram dane z rejestru…');
   const log = await fetchWorkLog(empEmail, empName, dateFrom, dateTo);
-  const totalMin = log.rows.reduce((a, r) => a + r.min, 0);
-  const totalCost = log.rows.reduce((a, r) => a + r.cost, 0);
-  const fmtHM = m => `${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}`;
-  const fmtMoney = v => v.toFixed(2).replace('.', ',');
-  const logRows = log.rows.length
-    ? log.rows.map((r, i) => `<tr>
-        <td class="center">${i+1}</td><td>${fmtDocDate(r.iso)}</td><td>${esc(r.obj)}</td><td>${esc(r.city)}</td>
-        <td class="center">${esc(r.start)}</td><td class="center">${esc(r.end)}</td>
-        <td class="center">${fmtHM(r.min)}</td><td class="right">${r.cost ? fmtMoney(r.cost) : ''}</td>
-        <td>${esc(r.note)}</td></tr>`).join('')
-    : '<tr><td colspan="9" class="center">Brak wpisów w rejestrze w tym zakresie</td></tr>';
-  const logTable = `
-  <p style="font-size:13px;font-weight:700;margin-bottom:8px">Ewidencja czasu pracy (${log.source})</p>
-  <table>
-    <tr><th>Lp.</th><th>Data</th><th>Obiekt</th><th>Miasto</th><th>Wejście</th><th>Wyjście</th><th>Czas</th><th>Koszty PLN</th><th>Opis</th></tr>
-    ${logRows}
-    <tr><td colspan="6" style="text-align:right;font-weight:700">RAZEM:</td>
-      <td class="center" style="font-weight:700">${fmtHM(totalMin)}</td>
-      <td class="right" style="font-weight:700">${fmtMoney(totalCost)}</td><td></td></tr>
-  </table>`;
+  const logTable = buildLogTable(log);
 
   const html = `
 <style>
