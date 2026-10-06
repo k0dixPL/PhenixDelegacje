@@ -572,50 +572,116 @@ input::placeholder { color: var(--fg-dim); }
 .locations-bar {
   margin-bottom: 14px;
   flex-shrink: 0;
+  position: relative;
 }
 
-.locations-scroll {
+/* row of city initials */
+.city-initials-row {
   display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  scrollbar-width: none;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
 }
-.locations-scroll::-webkit-scrollbar { display: none; }
 
-.loc-chip {
-  display: flex; align-items: center; gap: 6px;
+.city-initial-btn {
+  width: 34px; height: 34px;
+  border-radius: 10px;
   background: var(--surface);
   border: 1.5px solid var(--border);
-  border-radius: 20px;
-  padding: 6px 12px;
-  font-size: 12px; font-weight: 600; color: var(--fg-muted);
-  cursor: pointer; white-space: nowrap;
+  font-size: 13px; font-weight: 700;
+  color: var(--fg-muted);
+  cursor: pointer;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
   flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
 }
-.loc-chip:hover, .loc-chip.active {
+.city-initial-btn:hover,
+.city-initial-btn.open {
   border-color: var(--accent);
   color: var(--accent);
   background: var(--accent-bg);
 }
-.loc-chip-add {
-  border-style: dashed;
-  color: var(--fg-dim);
+.city-initial-btn.has-active {
+  border-color: var(--accent);
+  color: var(--accent);
 }
-.loc-chip-add:hover { color: var(--accent); }
 
-.loc-chip-del {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 16px; height: 16px;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--fg-dim);
-  font-size: 14px; line-height: 1;
-  margin-left: 2px;
-  transition: color 0.15s, background 0.15s;
+/* dropdown panel */
+.city-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 50;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 8px;
+  min-width: 220px;
+  max-width: 320px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+  display: none;
 }
-.loc-chip:hover .loc-chip-del { color: var(--red); }
+.city-dropdown.open { display: block; }
+
+.city-dropdown-title {
+  font-size: 11px; font-weight: 600; color: var(--fg-dim);
+  padding: 2px 6px 8px;
+  letter-spacing: 0.05em;
+}
+
+.obj-item {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px; font-weight: 500; color: var(--fg-muted);
+  transition: background 0.1s, color 0.1s;
+}
+.obj-item:hover { background: var(--surface2); color: var(--fg); }
+.obj-item.active { color: var(--accent); }
+.obj-item-name { flex: 1; }
+.obj-item-del {
+  opacity: 0;
+  color: var(--fg-dim);
+  font-size: 15px; line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: opacity 0.15s, color 0.15s;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.obj-item:hover .obj-item-del { opacity: 1; }
+.obj-item-del:hover { color: var(--red); }
+
+/* add button inside dropdown */
+.obj-add-btn {
+  display: flex; align-items: center; gap: 6px;
+  width: 100%;
+  margin-top: 4px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1.5px dashed var(--border);
+  background: none;
+  font-size: 12px; font-weight: 600; color: var(--fg-dim);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.obj-add-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* standalone add button (when no cities yet) */
+.loc-add-standalone {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1.5px dashed var(--border);
+  background: none;
+  font-size: 12px; font-weight: 600; color: var(--fg-dim);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.loc-add-standalone:hover { border-color: var(--accent); color: var(--accent); }
 
 /* === CITY EDIT MODAL === */
 .modal-overlay {
@@ -743,9 +809,10 @@ input::placeholder { color: var(--fg-dim); }
 
     <!-- Location shortcuts (baza obiektów) -->
     <div class="locations-bar" id="locations-bar">
-      <div class="locations-scroll" id="locations-scroll">
-        <!-- chips rendered by JS -->
+      <div class="city-initials-row" id="city-initials-row">
+        <!-- city initial buttons rendered by JS -->
       </div>
+      <!-- dropdowns rendered by JS, appended here -->
     </div>
 
     <!-- Status card -->
@@ -860,8 +927,11 @@ input::placeholder { color: var(--fg-dim); }
 <div class="modal-overlay" id="loc-modal" hidden>
   <div class="modal">
     <h3>📌 Nowy obiekt</h3>
-    <input type="text" id="inp-loc-name" placeholder="np. Klient Wrocław, Magazyn Gdańsk…">
-    <div class="modal-buttons">
+    <label style="font-size:11px;color:var(--fg-muted);display:block;margin-bottom:4px">Nazwa obiektu</label>
+    <input type="text" id="inp-loc-name" placeholder="np. Magazyn główny, Klient ABC…" style="margin-bottom:10px">
+    <label style="font-size:11px;color:var(--fg-muted);display:block;margin-bottom:4px">Miasto</label>
+    <input type="text" id="inp-loc-city" placeholder="np. Warszawa, Wrocław…">
+    <div class="modal-buttons" style="margin-top:14px">
       <button class="btn-secondary" id="btn-loc-cancel">Anuluj</button>
       <button class="btn-primary" id="btn-loc-confirm">Dodaj</button>
     </div>
@@ -1345,59 +1415,130 @@ if (savedStart) {
   }
 }
 
-// ---- Location shortcuts — shared via Google Sheets tab "Obiekty" ----
-// Local cache key: 'locations_cache' — used when offline or token expired
+// ---- Location shortcuts — shared via Google Sheets tab "Obiekty" (A=Nazwa, B=Miasto) ----
 const SHEET_LOCATIONS = 'Obiekty';
+// Cache format: [{name, city}, ...]
+let _locPendingCity = ''; // city to pre-fill when opening modal from a city's "add" button
 
 async function fetchLocations() {
-  // Try Sheets first; fall back to local cache
   if (state.sheetId && state.accessToken) {
     try {
-      const url = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_LOCATIONS)}!A:A`;
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${state.accessToken}` }
-      });
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_LOCATIONS)}!A:B`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${state.accessToken}` } });
       if (res.ok) {
         const data = await res.json();
-        const rows = (data.values || []).flat().filter(Boolean);
+        const rows = (data.values || [])
+          .filter(r => r[0] && r[0].trim())
+          .map(r => ({ name: r[0].trim(), city: (r[1] || '').trim() }));
         ls('locations_cache', rows);
         return rows;
       }
-    } catch(e) { /* offline — use cache */ }
+    } catch(e) { /* offline */ }
   }
   return lsJ('locations_cache') || [];
 }
 
 async function renderLocationChips() {
-  const scroll = document.getElementById('locations-scroll');
-  if (!scroll) return;
-
-  // Show spinner while loading
-  scroll.innerHTML = '<span style="color:var(--fg-dim);font-size:12px;padding:6px 4px">⏳</span>';
+  const bar = document.getElementById('city-initials-row');
+  if (!bar) return;
+  bar.innerHTML = '<span style="color:var(--fg-dim);font-size:12px;padding:4px">⏳</span>';
 
   const locs = await fetchLocations();
-  scroll.innerHTML = '';
+  bar.innerHTML = '';
 
-  locs.forEach(name => {
-    const chip = document.createElement('button');
-    chip.className = 'loc-chip' + (state.city === name ? ' active' : '');
-    chip.innerHTML = `<span>📌</span>${esc(name)}<span class="loc-chip-del" data-name="${esc(name)}" title="Usuń">×</span>`;
-    chip.addEventListener('click', (e) => {
-      if (e.target.classList.contains('loc-chip-del')) {
-        deleteLocation(e.target.dataset.name);
-      } else {
-        selectLocation(name);
-      }
-    });
-    scroll.appendChild(chip);
+  // Group by city
+  const cities = {};
+  locs.forEach(loc => {
+    const c = loc.city || '?';
+    if (!cities[c]) cities[c] = [];
+    cities[c].push(loc.name);
   });
 
-  // "+ Dodaj obiekt" chip
-  const addChip = document.createElement('button');
-  addChip.className = 'loc-chip loc-chip-add';
-  addChip.innerHTML = '＋ Dodaj obiekt';
-  addChip.addEventListener('click', () => openLocModal());
-  scroll.appendChild(addChip);
+  // Close all dropdowns helper
+  function closeAll() {
+    bar.querySelectorAll('.city-dropdown').forEach(d => d.classList.remove('open'));
+    bar.querySelectorAll('.city-initial-btn').forEach(b => b.classList.remove('open'));
+  }
+
+  Object.entries(cities).forEach(([city, names]) => {
+    const initial = city[0].toUpperCase();
+    const hasActive = names.includes(state.city);
+
+    // Wrapper (positioned) for button + dropdown
+    const wrap = document.createElement('div');
+    wrap.style.position = 'relative';
+
+    // City initial button
+    const btn = document.createElement('button');
+    btn.className = 'city-initial-btn' + (hasActive ? ' has-active' : '');
+    btn.title = city;
+    btn.textContent = initial;
+
+    // Dropdown panel
+    const drop = document.createElement('div');
+    drop.className = 'city-dropdown';
+
+    // City label header
+    const hdr = document.createElement('div');
+    hdr.className = 'city-dropdown-title';
+    hdr.textContent = city;
+    drop.appendChild(hdr);
+
+    // Object items
+    names.forEach(name => {
+      const item = document.createElement('div');
+      item.className = 'obj-item' + (state.city === name ? ' active' : '');
+      item.innerHTML = `<span class="obj-item-name">${esc(name)}</span><button class="obj-item-del" title="Usuń">×</button>`;
+      item.querySelector('.obj-item-name').addEventListener('click', () => {
+        selectLocation(name);
+        closeAll();
+      });
+      item.querySelector('.obj-item-del').addEventListener('click', e => {
+        e.stopPropagation();
+        deleteLocation(name, city);
+      });
+      drop.appendChild(item);
+    });
+
+    // "Dodaj obiekt" in this city
+    const addBtn = document.createElement('button');
+    addBtn.className = 'obj-add-btn';
+    addBtn.textContent = '＋ Dodaj obiekt';
+    addBtn.addEventListener('click', () => {
+      closeAll();
+      openLocModal(city);
+    });
+    drop.appendChild(addBtn);
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = drop.classList.contains('open');
+      closeAll();
+      if (!isOpen) {
+        drop.classList.add('open');
+        btn.classList.add('open');
+      }
+    });
+
+    wrap.appendChild(btn);
+    wrap.appendChild(drop);
+    bar.appendChild(wrap);
+  });
+
+  // "+ Nowe miasto" button (always present)
+  const newBtn = document.createElement('button');
+  newBtn.className = 'city-initial-btn';
+  newBtn.title = 'Dodaj nowy obiekt';
+  newBtn.innerHTML = '＋';
+  newBtn.style.fontSize = '16px';
+  newBtn.addEventListener('click', () => {
+    closeAll();
+    openLocModal('');
+  });
+  bar.appendChild(newBtn);
+
+  // Click outside closes all
+  document.addEventListener('click', closeAll, { once: false });
 }
 
 function selectLocation(name) {
@@ -1408,74 +1549,63 @@ function selectLocation(name) {
   showToast('📌 ' + name);
 }
 
-async function deleteLocation(name) {
-  // Find row number in sheet (1-indexed)
+async function deleteLocation(name, city) {
   const cache = lsJ('locations_cache') || [];
-  const rowIdx = cache.findIndex(n => n === name);
-  if (rowIdx === -1) { renderLocationChips(); return; }
-  const sheetRow = rowIdx + 1; // Sheets rows are 1-indexed
-
-  // Optimistic local update
-  const updated = cache.filter(n => n !== name);
+  const updated = cache.filter(l => !(l.name === name && l.city === city));
   ls('locations_cache', updated);
+  if (state.city === name) {
+    state.city = '';
+    ls('saved_city', '');
+    document.getElementById('city-label').textContent = '—';
+  }
   renderLocationChips();
 
   if (state.sheetId && state.accessToken) {
     try {
-      // Clear that row (batchClear)
-      const url = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values:batchClear`;
-      await fetch(url, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${state.accessToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ ranges: [`${SHEET_LOCATIONS}!A${sheetRow}`] })
-      });
-      // Reload fresh (gaps from clearing get handled by re-fetch)
-      // Re-write entire column to avoid empty rows
-      const cleanUrl = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_LOCATIONS)}!A:A?valueInputOption=RAW`;
-      await fetch(cleanUrl.replace('?', ':clear?').replace('A:A?', 'A:A'), {
+      // Clear entire A:B range, then rewrite clean list
+      const base = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_LOCATIONS)}`;
+      await fetch(`${base}!A:B:clear`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${state.accessToken}`, 'Content-Type': 'application/json' }
       });
-      // Write clean list back
-      const writeUrl = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_LOCATIONS)}!A1?valueInputOption=RAW`;
-      await fetch(writeUrl, {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${state.accessToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ values: updated.map(n => [n]) })
-      });
+      if (updated.length > 0) {
+        await fetch(`${base}!A1?valueInputOption=RAW`, {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${state.accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ values: updated.map(l => [l.name, l.city]) })
+        });
+      }
     } catch(e) {
       showToast('⚠️ Błąd usuwania z arkusza');
     }
   }
 }
 
-async function addLocationToSheet(name) {
-  // Optimistic local update
+async function addLocationToSheet(name, city) {
   const cache = lsJ('locations_cache') || [];
-  if (cache.some(n => n.toLowerCase() === name.toLowerCase())) return false; // duplicate
-  cache.push(name);
+  if (cache.some(l => l.name.toLowerCase() === name.toLowerCase() && l.city.toLowerCase() === city.toLowerCase())) return false;
+  cache.push({ name, city });
   ls('locations_cache', cache);
 
   if (state.sheetId && state.accessToken) {
     try {
-      const url = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_LOCATIONS)}!A:A:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`;
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_LOCATIONS)}!A:B:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`;
       await fetch(url, {
         method: 'POST',
         headers: { Authorization: `Bearer ${state.accessToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ values: [[name]] })
+        body: JSON.stringify({ values: [[name, city]] })
       });
     } catch(e) {
-      showToast('⚠️ Błąd zapisu do arkusza — obiekt zapisany lokalnie');
+      showToast('⚠️ Błąd zapisu — obiekt zapisany lokalnie');
     }
   }
   return true;
 }
 
-function openLocModal() {
+function openLocModal(preCity) {
+  _locPendingCity = preCity || '';
   document.getElementById('inp-loc-name').value = '';
+  document.getElementById('inp-loc-city').value = _locPendingCity;
   document.getElementById('loc-modal').hidden = false;
   document.getElementById('inp-loc-name').focus();
 }
@@ -1486,15 +1616,20 @@ document.getElementById('btn-loc-cancel').addEventListener('click', () => {
 
 document.getElementById('btn-loc-confirm').addEventListener('click', async () => {
   const name = document.getElementById('inp-loc-name').value.trim();
+  const city = document.getElementById('inp-loc-city').value.trim();
   if (!name) { showToast('Wpisz nazwę obiektu'); return; }
+  if (!city) { showToast('Wpisz nazwę miasta'); return; }
   document.getElementById('loc-modal').hidden = true;
-  const ok = await addLocationToSheet(name);
+  const ok = await addLocationToSheet(name, city);
   if (ok === false) { showToast('Obiekt już istnieje'); return; }
   renderLocationChips();
   showToast('✓ Dodano: ' + name);
 });
 
 document.getElementById('inp-loc-name').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('inp-loc-city').focus();
+});
+document.getElementById('inp-loc-city').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('btn-loc-confirm').click();
 });
 
