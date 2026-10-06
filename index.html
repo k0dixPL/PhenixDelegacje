@@ -1100,19 +1100,18 @@ async function appendToSheet(row) {
     showToast('⚠️ Brak konfiguracji — dane tylko lokalnie');
     return;
   }
+  // Kolejność kolumn: Data | Obiekt | Godz. wejścia | Godz. wyjścia | Email | Koszty PLN | Nazwa (opis faktur)
   const values = [[
-    row.person,
-    row.email,
     row.date,
     row.city,
     row.start,
     row.end,
-    row.hours,
+    row.email,
     row.invoiceSum !== '0.00' ? row.invoiceSum : '',
     row.invoices || ''
   ]];
   try {
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_REGISTER)}!A:I:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_REGISTER)}!A:G:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
     const res = await fetch(url, {
       method: 'POST',
       headers: {
