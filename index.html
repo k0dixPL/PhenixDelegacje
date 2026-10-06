@@ -1163,10 +1163,21 @@ input::placeholder { color: var(--fg-dim); }
     <h3>✎ Ręczny wpis</h3>
     <div style="display:flex;gap:10px;margin-bottom:12px">
       <div class="inp-wrap" style="flex:1">
-        <label style="font-size:11px;color:var(--fg-muted);display:block;margin-bottom:4px">Data</label>
+        <label style="font-size:11px;color:var(--fg-muted);display:block;margin-bottom:4px">Zakres</label>
+        <select id="inp-manual-range" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface2);color:var(--fg);font-family:var(--font-body);font-size:14px">
+          <option value="day">Jeden dzień</option>
+          <option value="week">Cały tydzień (pon–pt)</option>
+          <option value="month">Cały miesiąc (bez weekendów)</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:12px">
+      <div class="inp-wrap" style="flex:1">
+        <label style="font-size:11px;color:var(--fg-muted);display:block;margin-bottom:4px" id="lbl-manual-date">Data</label>
         <input type="date" id="inp-manual-date">
       </div>
     </div>
+    <p id="manual-range-info" style="font-size:12px;color:var(--fg-muted);margin:-4px 0 12px" hidden></p>
     <div class="inp-wrap" style="margin-bottom:12px">
       <label style="font-size:11px;color:var(--fg-muted);display:block;margin-bottom:4px">Obiekt / Miasto</label>
       <select id="inp-manual-city" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface2);color:var(--fg);font-family:var(--font-body);font-size:14px;appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%228%22 viewBox=%220 0 12 8%22><path d=%22M1 1l5 5 5-5%22 stroke=%22%237A8BA8%22 stroke-width=%221.5%22 fill=%22none%22 stroke-linecap=%22round%22/></svg>');background-repeat:no-repeat;background-position:right 12px center;padding-right:32px">
@@ -1389,6 +1400,13 @@ function showMain() {
 
   // Load history
   renderHistory();
+
+  // Bottom nav
+  document.getElementById('bottom-nav').classList.add('visible');
+  document.getElementById('screen-main').classList.add('with-nav');
+  document.getElementById('bn-praca').classList.add('active');
+  document.getElementById('bn-dokumenty').classList.remove('active');
+  document.getElementById('screen-docs').classList.remove('active');
 }
 
 function todayKey() {
@@ -1542,6 +1560,7 @@ async function endWork() {
     person: state.user.name,
     email: state.user.email,
     date: fmtDate(state.workStart),
+    locCity: cityOf(state.city),
     city: state.city,
     start: fmtTime(state.workStart),
     end: fmtTime(endTime),
@@ -1623,6 +1642,11 @@ function renderInvoices() {
 }
 
 // ---- Local history ----
+function cityOf(objName) {
+  const loc = (lsJ('locations_cache') || []).find(l => l.name === objName);
+  return (loc && loc.city) || '';
+}
+
 function saveHistory(row) {
   const hist = lsJ('history') || [];
   hist.unshift(row);
@@ -1649,7 +1673,7 @@ function renderHistory() {
         <div class="history-person">
           <div class="avatar" style="width:24px;height:24px;font-size:9px">${initials(r.person)}</div>
           ${esc(r.person)}
-          <span class="history-city">· ${esc(r.city)}</span>
+          <span class="history-city">· ${esc(r.city)}${r.locCity && r.locCity !== r.city ? ' · ' + esc(r.locCity) : ''}</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
           <span class="history-time">${esc(r.date)}</span>
@@ -1670,10 +1694,11 @@ async function appendToSheet(row) {
     showToast('⚠️ Brak konfiguracji — dane tylko lokalnie');
     return;
   }
-  // Kolejność kolumn: Data | Obiekt | Godz. wejścia | Godz. wyjścia | Email | Koszty PLN | Nazwa (opis faktur)
+  // Kolejność kolumn: Data | Obiekt | Miasto | Godz. wejścia | Godz. wyjścia | Email | Koszty PLN | Nazwa (opis faktur)
   const values = [[
     row.date,
     row.city,
+    row.locCity || '',
     row.start,
     row.end,
     row.email,
@@ -1681,7 +1706,7 @@ async function appendToSheet(row) {
     row.invoices || ''
   ]];
   try {
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_REGISTER)}!A:G:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_REGISTER)}!A:H:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
     const res = await fetch(url, {
       method: 'POST',
       headers: {
@@ -2058,6 +2083,7 @@ document.getElementById('btn-open-manual').addEventListener('click', async () =>
   const locs = await fetchLocations();
   refreshManualSelect(locs);
   if (state.city) document.getElementById('inp-manual-city').value = state.city;
+  document.getElementById('inp-manual-range').value = 'day'; updateManualRangeInfo();
   document.getElementById('manual-modal').hidden = false;
 });
 
@@ -2090,27 +2116,71 @@ document.getElementById('btn-manual-confirm').addEventListener('click', async ()
   const hrs = Math.floor(diffMin / 60), mins = diffMin % 60;
   const hours = `${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}:00`;
 
-  const [y, mo, d] = dateVal.split('-');
-  const dateDisplay = `${d}.${mo}.${y}`;
-
-  const row = {
-    person: state.user.name,
-    email:  state.user.email,
-    date:   dateDisplay,
-    city:   cityVal,
-    start:  startVal,
-    end:    endVal,
-    hours,
-    invoiceSum: amount > 0 ? amount.toFixed(2) : '0.00',
-    invoices:   amount > 0 && desc ? `${amount.toFixed(2)} zł – ${desc}` : (desc || '')
-  };
+  const dates = manualDates(dateVal, document.getElementById('inp-manual-range').value);
+  if (!dates.length) { showToast('Brak dni roboczych w zakresie'); return; }
 
   document.getElementById('manual-modal').hidden = true;
-  await appendToSheet(row);
-  saveHistory(row);
+  let okAll = true;
+  for (let n = 0; n < dates.length; n++) {
+    const [y, mo, d] = dates[n].split('-');
+    const row = {
+      person: state.user.name,
+      email:  state.user.email,
+      date:   `${d}.${mo}.${y}`,
+      city:   cityVal,
+      locCity: cityOf(cityVal),
+      start:  startVal,
+      end:    endVal,
+      hours,
+      // koszty tylko w pierwszym dniu serii, by nie dublować
+      invoiceSum: n === 0 && amount > 0 ? amount.toFixed(2) : '0.00',
+      invoices:   n === 0 ? (amount > 0 && desc ? `${amount.toFixed(2)} zł – ${desc}` : (desc || '')) : ''
+    };
+    const r = await appendToSheet(row);
+    if (r === false) okAll = false;
+    saveHistory(row);
+  }
   renderHistory();
-  showToast('✓ Wpis zapisany');
+  showToast(dates.length > 1 ? `✓ Zapisano ${dates.length} dni` : '✓ Wpis zapisany');
 });
+
+// Dni robocze (pon–pt) dla trybu: dzień / tydzień zawierający datę / miesiąc zawierający datę
+function manualDates(dateStr, mode) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const iso = dt => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  if (mode === 'day') return [dateStr];
+  let from, to;
+  if (mode === 'week') {
+    const base = new Date(y, m-1, d);
+    const off = (base.getDay() + 6) % 7; // pon=0
+    from = new Date(y, m-1, d - off);
+    to = new Date(y, m-1, d - off + 6);
+  } else {
+    from = new Date(y, m-1, 1);
+    to = new Date(y, m, 0);
+  }
+  const out = [];
+  for (const c = new Date(from); c <= to; c.setDate(c.getDate() + 1)) {
+    if (c.getDay() !== 0 && c.getDay() !== 6) out.push(iso(c));
+  }
+  return out;
+}
+
+function updateManualRangeInfo() {
+  const mode = document.getElementById('inp-manual-range').value;
+  const v = document.getElementById('inp-manual-date').value;
+  const info = document.getElementById('manual-range-info');
+  document.getElementById('lbl-manual-date').textContent =
+    mode === 'day' ? 'Data' : mode === 'week' ? 'Dowolny dzień tygodnia' : 'Dowolny dzień miesiąca';
+  if (mode === 'day' || !v) { info.hidden = true; return; }
+  const ds = manualDates(v, mode);
+  info.hidden = false;
+  info.textContent = ds.length
+    ? `Zostanie dodanych ${ds.length} wpisów (${ds[0].split('-').reverse().join('.')} – ${ds[ds.length-1].split('-').reverse().join('.')}), bez weekendów. Koszty trafią do pierwszego dnia.`
+    : 'Brak dni roboczych.';
+}
+document.getElementById('inp-manual-range').addEventListener('change', updateManualRangeInfo);
+document.getElementById('inp-manual-date').addEventListener('change', updateManualRangeInfo);
 
 // ---- Start ----
 init();
@@ -2212,7 +2282,7 @@ function countWorkdays(fromStr, toStr) {
   return count;
 }
 
-function fmtDate(str) {
+function fmtDocDate(str) {
   if (!str) return '—';
   const [y,m,d] = str.split('-');
   return `${d}.${m}.${y}`;
@@ -2267,14 +2337,14 @@ function generateDelegacja() {
 </style>
 <div class="pdel">
   <h2>POLECENIE WYJAZDU SŁUŻBOWEGO</h2>
-  <p class="sub">Nr: ${esc(orderNum)} &nbsp;|&nbsp; Data wystawienia: ${fmtDate(orderDate)}</p>
+  <p class="sub">Nr: ${esc(orderNum)} &nbsp;|&nbsp; Data wystawienia: ${fmtDocDate(orderDate)}</p>
 
   <table>
     <tr><th style="width:40%">Pracownik</th><td>${esc(empName)}</td></tr>
     <tr><th>Stanowisko</th><td>${esc(empPos)}</td></tr>
     <tr><th>Miejsce docelowe</th><td>${esc(city)}</td></tr>
-    <tr><th>Data wyjazdu</th><td>${fmtDate(dateFrom)}</td></tr>
-    <tr><th>Data powrotu</th><td>${fmtDate(dateTo)}</td></tr>
+    <tr><th>Data wyjazdu</th><td>${fmtDocDate(dateFrom)}</td></tr>
+    <tr><th>Data powrotu</th><td>${fmtDocDate(dateTo)}</td></tr>
     <tr><th>Cel wyjazdu</th><td>${esc(purpose)}</td></tr>
     <tr><th>Środek transportu</th><td>${esc(transport)}</td></tr>
   </table>
@@ -2351,20 +2421,20 @@ function generateUrlop() {
 </style>
 <div class="purl">
   <h2>WNIOSEK O URLOP</h2>
-  <p class="sub">Data złożenia: ${fmtDate(submission)}</p>
+  <p class="sub">Data złożenia: ${fmtDocDate(submission)}</p>
 
   <table>
     <tr><th style="width:45%">Pracownik</th><td>${esc(empName)}</td></tr>
     <tr><th>Stanowisko</th><td>${esc(empPos)}</td></tr>
     <tr><th>Rodzaj urlopu</th><td style="text-transform:capitalize">${esc(type)}</td></tr>
-    <tr><th>Urlop od</th><td>${fmtDate(dateFrom)}</td></tr>
-    <tr><th>Urlop do</th><td>${fmtDate(dateTo)}</td></tr>
+    <tr><th>Urlop od</th><td>${fmtDocDate(dateFrom)}</td></tr>
+    <tr><th>Urlop do</th><td>${fmtDocDate(dateTo)}</td></tr>
     <tr><th>Liczba dni roboczych</th><td>${esc(workdays)}</td></tr>
   </table>
 
   <p style="font-size:12px;margin-bottom:20px">
-    Proszę o udzielenie urlopu <strong>${esc(type)}</strong> w terminie od <strong>${fmtDate(dateFrom)}</strong>
-    do <strong>${fmtDate(dateTo)}</strong> (${esc(workdays)}).
+    Proszę o udzielenie urlopu <strong>${esc(type)}</strong> w terminie od <strong>${fmtDocDate(dateFrom)}</strong>
+    do <strong>${fmtDocDate(dateTo)}</strong> (${esc(workdays)}).
   </p>
 
   <table class="sig-row">
@@ -2380,15 +2450,6 @@ function generateUrlop() {
   document.getElementById('print-urlop-overlay').style.display = 'block';
 }
 
-// Patch showMain to show bottom nav + padding
-const _origShowMain = showMain;
-showMain = function() {
-  _origShowMain();
-  document.getElementById('bottom-nav').classList.add('visible');
-  document.getElementById('screen-main').classList.add('with-nav');
-  document.getElementById('bn-praca').classList.add('active');
-  document.getElementById('bn-dokumenty').classList.remove('active');
-};
 </script>
 </body>
 </html>
