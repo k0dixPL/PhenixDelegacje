@@ -771,6 +771,117 @@ input::placeholder { color: var(--fg-dim); }
 @media (prefers-reduced-motion: reduce) {
   .btn-action, .btn-add-invoice { transition: none; }
 }
+
+/* === BOTTOM NAV === */
+#bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 50%;
+  transform: translateX(-50%);
+  width: 100%; max-width: 480px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  z-index: 200;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+#bottom-nav.visible { display: flex; }
+.bn-tab {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; padding: 10px 0 10px;
+  background: none; border: none; cursor: pointer;
+  color: var(--fg-muted); font-family: var(--font-body); font-size: 11px; font-weight: 600;
+  transition: color .15s;
+}
+.bn-tab.active { color: var(--accent); }
+.bn-icon { font-size: 20px; line-height: 1; }
+
+/* Main screen needs padding when nav is visible */
+#screen-main.with-nav { padding-bottom: 72px; }
+
+/* === DOKUMENTY SCREEN === */
+#screen-docs {
+  padding-bottom: 80px;
+  overflow-y: auto;
+}
+#screen-docs .topbar { margin-bottom: 12px; }
+
+/* Sub-tabs */
+.doc-subtabs {
+  display: flex; gap: 0;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 20px; flex-shrink: 0;
+}
+.doc-subtab {
+  flex: 1; padding: 10px 0; text-align: center;
+  background: none; border: none; cursor: pointer;
+  font-family: var(--font-body); font-size: 14px; font-weight: 600;
+  color: var(--fg-muted); border-bottom: 2px solid transparent;
+  margin-bottom: -2px; transition: color .15s, border-color .15s;
+}
+.doc-subtab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Doc form */
+.doc-form { display: flex; flex-direction: column; gap: 14px; }
+.doc-field label {
+  display: block; font-size: 11px; font-weight: 600; color: var(--fg-muted);
+  letter-spacing: .04em; margin-bottom: 5px;
+}
+.doc-field input, .doc-field select, .doc-field textarea {
+  width: 100%; padding: 10px 12px;
+  border-radius: 10px; border: 1.5px solid var(--border);
+  background: var(--surface2); color: var(--fg);
+  font-family: var(--font-body); font-size: 14px;
+  transition: border-color .15s;
+}
+.doc-field input:focus, .doc-field select:focus { outline: none; border-color: var(--accent); }
+.doc-field select {
+  appearance: none; -webkit-appearance: none;
+  background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%228%22 viewBox=%220 0 12 8%22><path d=%22M1 1l5 5 5-5%22 stroke=%22%237A8BA8%22 stroke-width=%221.5%22 fill=%22none%22 stroke-linecap=%22round%22/></svg>');
+  background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px;
+}
+.doc-field input[readonly] { color: var(--fg-muted); cursor: default; }
+.doc-row { display: flex; gap: 10px; }
+.doc-row .doc-field { flex: 1; }
+.btn-generate {
+  width: 100%; padding: 13px;
+  background: var(--accent); border: none; border-radius: 12px;
+  font-family: var(--font-body); font-size: 15px; font-weight: 700; color: #000;
+  cursor: pointer; margin-top: 6px;
+  transition: opacity .15s;
+}
+.btn-generate:hover { opacity: .88; }
+
+/* === PRINT PREVIEW MODAL === */
+.print-modal-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: #fff; overflow: auto;
+}
+.print-modal-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; background: #f5f5f5;
+  border-bottom: 1px solid #ddd; position: sticky; top: 0; z-index: 1;
+}
+.print-modal-topbar .no-print { display: flex; gap: 8px; }
+.btn-print-close {
+  padding: 8px 16px; border-radius: 8px;
+  background: #e0e0e0; border: none; cursor: pointer;
+  font-size: 13px; font-weight: 600;
+}
+.btn-print-do {
+  padding: 8px 16px; border-radius: 8px;
+  background: #1a1a1a; color: #fff; border: none; cursor: pointer;
+  font-size: 13px; font-weight: 700;
+}
+.print-doc { padding: 24px; max-width: 800px; margin: 0 auto; }
+
+/* Print styles — show only .print-doc */
+@media print {
+  body > * { display: none !important; }
+  .print-modal-overlay { display: block !important; background: #fff; }
+  .print-modal-overlay .no-print { display: none !important; }
+  .print-doc { display: block !important; }
+  * { color: #000 !important; background: #fff !important; border-color: #000 !important; }
+}
 </style>
 </head>
 <body>
@@ -780,9 +891,7 @@ input::placeholder { color: var(--fg-dim); }
   <div id="screen-login" class="screen active">
     <div class="login-logo">
       <div class="mark">
-        <svg width="48" height="48" viewBox="0 0 1100 1100" xmlns="http://www.w3.org/2000/svg">
-          <path fill="#C8232A" d="M544 60 C480 120 370 200 260 310 C180 390 120 480 100 570 C80 650 110 710 160 740 C210 770 280 760 340 730 C290 790 270 860 290 920 C310 980 370 1010 430 1000 C490 990 540 950 580 900 C560 960 570 1010 610 1030 C650 1050 700 1020 730 970 C760 920 770 850 760 790 C800 850 850 890 900 880 C950 870 980 820 970 760 C960 700 920 640 870 590 C930 610 990 600 1020 560 C1050 520 1040 460 1000 420 C960 380 900 360 840 360 C900 320 940 260 920 210 C900 160 840 140 780 150 C720 160 670 200 640 250 C650 180 620 110 544 60 Z"/>
-        </svg>
+        <img src="data:image/png;base64,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" width="56" height="56" alt="Phenix" style="object-fit:contain">
       </div>
       <h1>Phenix-IT</h1>
       <p>Rejestr czasu pracy i wydatków w delegacjach</p>
@@ -807,9 +916,7 @@ input::placeholder { color: var(--fg-dim); }
 
     <div class="topbar">
       <div class="topbar-logo">
-        <svg width="28" height="28" viewBox="0 0 1100 1100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path fill="#C8232A" d="M544 60 C480 120 370 200 260 310 C180 390 120 480 100 570 C80 650 110 710 160 740 C210 770 280 760 340 730 C290 790 270 860 290 920 C310 980 370 1010 430 1000 C490 990 540 950 580 900 C560 960 570 1010 610 1030 C650 1050 700 1020 730 970 C760 920 770 850 760 790 C800 850 850 890 900 880 C950 870 980 820 970 760 C960 700 920 640 870 590 C930 610 990 600 1020 560 C1050 520 1040 460 1000 420 C960 380 900 360 840 360 C900 320 940 260 920 210 C900 160 840 140 780 150 C720 160 670 200 640 250 C650 180 620 110 544 60 Z"/>
-        </svg>
+        <img src="data:image/png;base64,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" width="28" height="28" alt="Phenix" style="object-fit:contain" aria-hidden="true">
         <span class="topbar-logo-text">Phenix<span>-IT</span></span>
       </div>
       <div style="display:flex;align-items:center;gap:8px">
@@ -892,7 +999,147 @@ input::placeholder { color: var(--fg-dim); }
 
   </div><!-- /screen-main -->
 
+  <!-- ============ DOKUMENTY SCREEN ============ -->
+  <div id="screen-docs" class="screen">
+
+    <div class="topbar">
+      <div class="topbar-logo">
+        <span class="topbar-logo-text">Phenix<span>-IT</span></span>
+      </div>
+      <div class="topbar-user">
+        <div class="avatar" id="docs-avatar">?</div>
+        <span id="docs-name-label">—</span>
+      </div>
+    </div>
+
+    <div class="doc-subtabs">
+      <button class="doc-subtab active" id="subtab-delegacja" onclick="showDocSubtab('delegacja')">✈ Delegacja</button>
+      <button class="doc-subtab" id="subtab-urlop" onclick="showDocSubtab('urlop')">🌴 Urlop</button>
+    </div>
+
+    <!-- Delegacja sub-screen -->
+    <div id="doc-delegacja">
+      <p class="section-title">Polecenie wyjazdu służbowego</p>
+      <div class="doc-form">
+        <div class="doc-field">
+          <label>Pracownik</label>
+          <select id="del-employee"></select>
+        </div>
+        <div class="doc-field">
+          <label>Miejsce docelowe</label>
+          <select id="del-city"></select>
+        </div>
+        <div class="doc-row">
+          <div class="doc-field">
+            <label>Data wyjazdu</label>
+            <input type="date" id="del-date-from" oninput="delAutoFriday()">
+          </div>
+          <div class="doc-field">
+            <label>Data powrotu</label>
+            <input type="date" id="del-date-to">
+          </div>
+        </div>
+        <div class="doc-field">
+          <label>Cel wyjazdu</label>
+          <input type="text" id="del-purpose" value="Realizacja zlecenia instalacji systemu zabezpieczeń">
+        </div>
+        <div class="doc-field">
+          <label>Środek transportu</label>
+          <input type="text" id="del-transport" value="Samochód służbowy">
+        </div>
+        <div class="doc-row">
+          <div class="doc-field">
+            <label>Numer polecenia</label>
+            <input type="text" id="del-order-num" placeholder="np. 01/2025">
+          </div>
+          <div class="doc-field">
+            <label>Data polecenia</label>
+            <input type="date" id="del-order-date">
+          </div>
+        </div>
+        <button class="btn-generate" onclick="generateDelegacja()">Generuj dokument</button>
+      </div>
+    </div>
+
+    <!-- Urlop sub-screen -->
+    <div id="doc-urlop" style="display:none">
+      <p class="section-title">Wniosek o urlop</p>
+      <div class="doc-form">
+        <div class="doc-field">
+          <label>Pracownik</label>
+          <select id="url-employee"></select>
+        </div>
+        <div class="doc-field">
+          <label>Rodzaj urlopu</label>
+          <select id="url-type">
+            <option value="wypoczynkowy">Wypoczynkowy</option>
+            <option value="na żądanie">Na żądanie</option>
+            <option value="bezpłatny">Bezpłatny</option>
+            <option value="okolicznościowy">Okolicznościowy</option>
+          </select>
+        </div>
+        <div class="doc-row">
+          <div class="doc-field">
+            <label>Urlop od</label>
+            <input type="date" id="url-date-from" oninput="urlCompute()">
+          </div>
+          <div class="doc-field">
+            <label>Urlop do</label>
+            <input type="date" id="url-date-to" oninput="urlCompute()">
+          </div>
+        </div>
+        <div class="doc-row">
+          <div class="doc-field">
+            <label>Dni robocze</label>
+            <input type="text" id="url-workdays" readonly placeholder="—">
+          </div>
+          <div class="doc-field">
+            <label>Data złożenia wniosku</label>
+            <input type="date" id="url-submission">
+          </div>
+        </div>
+        <button class="btn-generate" onclick="generateUrlop()">Generuj wniosek</button>
+      </div>
+    </div>
+
+  </div><!-- /screen-docs -->
+
 </div><!-- /app -->
+
+<!-- Bottom nav -->
+<nav id="bottom-nav">
+  <button class="bn-tab active" id="bn-praca" onclick="switchTab('praca')">
+    <span class="bn-icon">⏱</span>
+    Praca
+  </button>
+  <button class="bn-tab" id="bn-dokumenty" onclick="switchTab('dokumenty')">
+    <span class="bn-icon">📄</span>
+    Dokumenty
+  </button>
+</nav>
+
+<!-- Print preview overlays (hidden by default) -->
+<div id="print-delegacja-overlay" class="print-modal-overlay" style="display:none">
+  <div class="print-modal-topbar">
+    <strong style="color:#000">Podgląd wydruku</strong>
+    <div class="no-print">
+      <button class="btn-print-close" onclick="document.getElementById('print-delegacja-overlay').style.display='none'">✕ Zamknij</button>
+      <button class="btn-print-do" onclick="window.print()">🖨 Drukuj</button>
+    </div>
+  </div>
+  <div class="print-doc" id="print-delegacja-content"></div>
+</div>
+
+<div id="print-urlop-overlay" class="print-modal-overlay" style="display:none">
+  <div class="print-modal-topbar">
+    <strong style="color:#000">Podgląd wydruku</strong>
+    <div class="no-print">
+      <button class="btn-print-close" onclick="document.getElementById('print-urlop-overlay').style.display='none'">✕ Zamknij</button>
+      <button class="btn-print-do" onclick="window.print()">🖨 Drukuj</button>
+    </div>
+  </div>
+  <div class="print-doc" id="print-urlop-content"></div>
+</div>
 
 <!-- City edit modal -->
 <div class="modal-overlay" id="city-modal" hidden>
@@ -1867,6 +2114,281 @@ document.getElementById('btn-manual-confirm').addEventListener('click', async ()
 
 // ---- Start ----
 init();
+
+// ============================================================
+//  DOKUMENTY TAB
+// ============================================================
+
+const DOC_EMPLOYEES = [
+  { name: 'Konrad Wujkowski', position: 'Instalator' },
+  { name: 'Grzegorz Ujek',    position: 'Instalator' },
+  { name: 'Emil Norejko',     position: 'Instalator' }
+];
+
+// ---- Tab switching ----
+function switchTab(tab) {
+  const nav = document.getElementById('bottom-nav');
+  nav.classList.add('visible');
+  document.getElementById('bn-praca').classList.toggle('active', tab === 'praca');
+  document.getElementById('bn-dokumenty').classList.toggle('active', tab === 'dokumenty');
+
+  const main = document.getElementById('screen-main');
+  const docs = document.getElementById('screen-docs');
+  if (tab === 'praca') {
+    main.classList.add('active');
+    docs.classList.remove('active');
+    main.classList.add('with-nav');
+  } else {
+    main.classList.remove('active');
+    docs.classList.add('active');
+    initDocsScreen();
+  }
+}
+
+function showDocSubtab(sub) {
+  document.getElementById('doc-delegacja').style.display = sub === 'delegacja' ? '' : 'none';
+  document.getElementById('doc-urlop').style.display     = sub === 'urlop'     ? '' : 'none';
+  document.getElementById('subtab-delegacja').classList.toggle('active', sub === 'delegacja');
+  document.getElementById('subtab-urlop').classList.toggle('active',     sub === 'urlop');
+}
+
+function initDocsScreen() {
+  if (!state.user) return;
+  // Update avatar
+  const initials = (state.user.name || 'U').split(' ').map(w => w[0]).join('').substring(0,2).toUpperCase();
+  document.getElementById('docs-avatar').textContent = initials;
+  document.getElementById('docs-name-label').textContent = (state.user.name || '').split(' ')[0];
+
+  // Build employee selects
+  buildEmployeeSelect('del-employee');
+  buildEmployeeSelect('url-employee');
+  // Build city select for delegacja
+  buildCitySelect();
+  // Auto-set today for urlop submission
+  document.getElementById('url-submission').value = fridayBefore(new Date());
+}
+
+function buildEmployeeSelect(id) {
+  const sel = document.getElementById(id);
+  sel.innerHTML = DOC_EMPLOYEES.map(e =>
+    `<option value="${esc(e.name)}" data-pos="${esc(e.position)}">${esc(e.name)} — ${esc(e.position)}</option>`
+  ).join('');
+  // Pre-select logged-in user
+  if (state.user && state.user.name) {
+    const match = DOC_EMPLOYEES.findIndex(e => e.name.toLowerCase() === state.user.name.toLowerCase());
+    if (match >= 0) sel.selectedIndex = match;
+  }
+}
+
+function buildCitySelect() {
+  const cache = lsJ('locations_cache') || [];
+  const cities = [...new Set(cache.map(l => l.city).filter(Boolean))].sort();
+  const sel = document.getElementById('del-city');
+  sel.innerHTML = cities.length
+    ? cities.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('')
+    : '<option value="">— brak obiektów —</option>';
+}
+
+// ---- Helpers ----
+function fridayBefore(date) {
+  const d = new Date(date);
+  // Go back to the most recent Friday (or same day if already Friday)
+  const day = d.getDay(); // 0=Sun … 5=Fri … 6=Sat
+  const diff = day === 5 ? 0 : (day < 5 ? day + 2 : 1); // days to go back
+  d.setDate(d.getDate() - diff);
+  return d.toISOString().substring(0, 10);
+}
+
+function countWorkdays(fromStr, toStr) {
+  if (!fromStr || !toStr) return 0;
+  let count = 0;
+  const d = new Date(fromStr);
+  const end = new Date(toStr);
+  while (d <= end) {
+    const day = d.getDay();
+    if (day !== 0 && day !== 6) count++;
+    d.setDate(d.getDate() + 1);
+  }
+  return count;
+}
+
+function fmtDate(str) {
+  if (!str) return '—';
+  const [y,m,d] = str.split('-');
+  return `${d}.${m}.${y}`;
+}
+
+// ---- Delegacja auto-fill ----
+function delAutoFriday() {
+  const from = document.getElementById('del-date-from').value;
+  if (from) {
+    document.getElementById('del-order-date').value = fridayBefore(new Date(from));
+  }
+}
+
+// ---- Urlop compute ----
+function urlCompute() {
+  const from = document.getElementById('url-date-from').value;
+  const to   = document.getElementById('url-date-to').value;
+  const wd = countWorkdays(from, to);
+  document.getElementById('url-workdays').value = wd > 0 ? wd + ' dni' : '—';
+  if (from) {
+    document.getElementById('url-submission').value = fridayBefore(new Date(from));
+  }
+}
+
+// ---- Generate Delegacja ----
+function generateDelegacja() {
+  const empSel = document.getElementById('del-employee');
+  const empName = empSel.value;
+  const empPos  = empSel.selectedOptions[0]?.dataset.pos || 'Pracownik';
+  const city       = document.getElementById('del-city').value || '—';
+  const dateFrom   = document.getElementById('del-date-from').value;
+  const dateTo     = document.getElementById('del-date-to').value;
+  const purpose    = document.getElementById('del-purpose').value.trim() || '—';
+  const transport  = document.getElementById('del-transport').value.trim() || '—';
+  const orderNum   = document.getElementById('del-order-num').value.trim() || '—';
+  const orderDate  = document.getElementById('del-order-date').value;
+
+  if (!dateFrom || !dateTo) { showToast('Uzupełnij daty wyjazdu i powrotu'); return; }
+
+  const html = `
+<style>
+  .pdel { font-family: Arial, sans-serif; font-size: 12px; color: #000; }
+  .pdel h2 { text-align: center; font-size: 16px; margin-bottom: 4px; }
+  .pdel .sub { text-align: center; font-size: 13px; margin-bottom: 20px; color: #333; }
+  .pdel table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+  .pdel td, .pdel th { border: 1px solid #000; padding: 5px 8px; vertical-align: top; }
+  .pdel th { background: #f0f0f0; text-align: left; font-weight: 600; white-space: nowrap; }
+  .pdel .sig-row td { height: 60px; vertical-align: bottom; font-size: 11px; }
+  .pdel .center { text-align: center; }
+  .pdel .right  { text-align: right; }
+  .pdel .small  { font-size: 11px; color: #555; }
+</style>
+<div class="pdel">
+  <h2>POLECENIE WYJAZDU SŁUŻBOWEGO</h2>
+  <p class="sub">Nr: ${esc(orderNum)} &nbsp;|&nbsp; Data wystawienia: ${fmtDate(orderDate)}</p>
+
+  <table>
+    <tr><th style="width:40%">Pracownik</th><td>${esc(empName)}</td></tr>
+    <tr><th>Stanowisko</th><td>${esc(empPos)}</td></tr>
+    <tr><th>Miejsce docelowe</th><td>${esc(city)}</td></tr>
+    <tr><th>Data wyjazdu</th><td>${fmtDate(dateFrom)}</td></tr>
+    <tr><th>Data powrotu</th><td>${fmtDate(dateTo)}</td></tr>
+    <tr><th>Cel wyjazdu</th><td>${esc(purpose)}</td></tr>
+    <tr><th>Środek transportu</th><td>${esc(transport)}</td></tr>
+  </table>
+
+  <p style="font-size:13px;font-weight:700;margin-bottom:8px">Rachunek Kosztów Podróży</p>
+  <table>
+    <tr>
+      <th>Lp.</th>
+      <th>Rodzaj kosztu</th>
+      <th>Kwota (PLN)</th>
+      <th>Uwagi</th>
+    </tr>
+    <tr><td class="center">1</td><td>Paliwo</td><td></td><td></td></tr>
+    <tr><td class="center">2</td><td>Noclegi</td><td></td><td></td></tr>
+    <tr><td class="center">3</td><td>Diety</td><td></td><td></td></tr>
+    <tr><td class="center">4</td><td>Inne</td><td></td><td></td></tr>
+    <tr>
+      <td colspan="2" style="text-align:right;font-weight:700">RAZEM:</td>
+      <td></td><td></td>
+    </tr>
+  </table>
+
+  <p style="font-size:13px;font-weight:700;margin-bottom:8px">Dodatkowe rozliczenie</p>
+  <table>
+    <tr>
+      <th>Opis</th>
+      <th>Kwota</th>
+      <th>Data</th>
+      <th>Dokument</th>
+    </tr>
+    <tr><td>&nbsp;</td><td></td><td></td><td></td></tr>
+    <tr><td>&nbsp;</td><td></td><td></td><td></td></tr>
+    <tr><td>&nbsp;</td><td></td><td></td><td></td></tr>
+  </table>
+
+  <table class="sig-row" style="margin-top:24px">
+    <tr>
+      <td style="width:50%" class="center small">Podpis pracownika<br><br><br></td>
+      <td style="width:50%" class="center small">Zatwierdzający<br><br><br></td>
+    </tr>
+  </table>
+  <p class="small right" style="margin-top:6px">Phenix-IT Sp. z o.o. | Drukowano: ${new Date().toLocaleDateString('pl-PL')}</p>
+</div>`;
+
+  document.getElementById('print-delegacja-content').innerHTML = html;
+  document.getElementById('print-delegacja-overlay').style.display = 'block';
+}
+
+// ---- Generate Urlop ----
+function generateUrlop() {
+  const empSel = document.getElementById('url-employee');
+  const empName = empSel.value;
+  const empPos  = empSel.selectedOptions[0]?.dataset.pos || 'Pracownik';
+  const type       = document.getElementById('url-type').value;
+  const dateFrom   = document.getElementById('url-date-from').value;
+  const dateTo     = document.getElementById('url-date-to').value;
+  const workdays   = document.getElementById('url-workdays').value || '—';
+  const submission = document.getElementById('url-submission').value;
+
+  if (!dateFrom || !dateTo) { showToast('Uzupełnij daty urlopu'); return; }
+
+  const html = `
+<style>
+  .purl { font-family: Arial, sans-serif; font-size: 12px; color: #000; }
+  .purl h2 { text-align: center; font-size: 16px; margin-bottom: 4px; }
+  .purl .sub { text-align: center; font-size: 12px; margin-bottom: 20px; color: #333; }
+  .purl table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+  .purl td, .purl th { border: 1px solid #000; padding: 5px 8px; vertical-align: top; }
+  .purl th { background: #f0f0f0; text-align: left; font-weight: 600; white-space: nowrap; }
+  .purl .sig-row td { height: 60px; vertical-align: bottom; font-size: 11px; }
+  .purl .center { text-align: center; }
+  .purl .right  { text-align: right; }
+  .purl .small  { font-size: 11px; color: #555; }
+</style>
+<div class="purl">
+  <h2>WNIOSEK O URLOP</h2>
+  <p class="sub">Data złożenia: ${fmtDate(submission)}</p>
+
+  <table>
+    <tr><th style="width:45%">Pracownik</th><td>${esc(empName)}</td></tr>
+    <tr><th>Stanowisko</th><td>${esc(empPos)}</td></tr>
+    <tr><th>Rodzaj urlopu</th><td style="text-transform:capitalize">${esc(type)}</td></tr>
+    <tr><th>Urlop od</th><td>${fmtDate(dateFrom)}</td></tr>
+    <tr><th>Urlop do</th><td>${fmtDate(dateTo)}</td></tr>
+    <tr><th>Liczba dni roboczych</th><td>${esc(workdays)}</td></tr>
+  </table>
+
+  <p style="font-size:12px;margin-bottom:20px">
+    Proszę o udzielenie urlopu <strong>${esc(type)}</strong> w terminie od <strong>${fmtDate(dateFrom)}</strong>
+    do <strong>${fmtDate(dateTo)}</strong> (${esc(workdays)}).
+  </p>
+
+  <table class="sig-row">
+    <tr>
+      <td style="width:50%" class="center small">Podpis pracownika<br><br><br></td>
+      <td style="width:50%" class="center small">Decyzja przełożonego<br><br><br></td>
+    </tr>
+  </table>
+  <p class="small right" style="margin-top:6px">Phenix-IT Sp. z o.o. | Drukowano: ${new Date().toLocaleDateString('pl-PL')}</p>
+</div>`;
+
+  document.getElementById('print-urlop-content').innerHTML = html;
+  document.getElementById('print-urlop-overlay').style.display = 'block';
+}
+
+// Patch showMain to show bottom nav + padding
+const _origShowMain = showMain;
+showMain = function() {
+  _origShowMain();
+  document.getElementById('bottom-nav').classList.add('visible');
+  document.getElementById('screen-main').classList.add('with-nav');
+  document.getElementById('bn-praca').classList.add('active');
+  document.getElementById('bn-dokumenty').classList.remove('active');
+};
 </script>
 </body>
 </html>
