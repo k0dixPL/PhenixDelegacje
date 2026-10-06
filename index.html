@@ -2344,8 +2344,64 @@ function urlCompute() {
   }
 }
 
+// ---- Dane z rejestru dla pracownika i zakresu dat ----
+function parseRegDate(v) {
+  v = String(v || '').trim();
+  let m = v.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})$/);
+  if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? v : '';
+}
+function toMin(t) {
+  const m = String(t || '').match(/(\d{1,2}):(\d{2})/);
+  return m ? (+m[1]) * 60 + (+m[2]) : null;
+}
+
+async function fetchWorkLog(email, name, from, to) {
+  let raw = null, source = 'rejestr Google Sheets';
+  if (state.sheetId && state.accessToken) {
+    try {
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_REGISTER)}!A:H`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${state.accessToken}` } });
+      if (res.ok) raw = ((await res.json()).values || []);
+    } catch(e) {}
+  }
+  const rows = [];
+  if (raw) {
+    // kolumny: A Data | B Obiekt | C Miasto | D Wejście | E Wyjście | F Email | G Koszty | H Opis
+    for (const r of raw) {
+      const iso = parseRegDate(r[0]);
+      if (!iso || iso < from || iso > to) continue;
+      if (email ? (String(r[5] || '').trim().toLowerCase() !== email) : false) continue;
+      const s0 = toMin(r[3]), e0 = toMin(r[4]);
+      rows.push({
+        iso, obj: r[1] || '', city: r[2] || '', start: r[3] || '', end: r[4] || '',
+        min: (s0 != null && e0 != null && e0 > s0) ? e0 - s0 : 0,
+        cost: parseFloat(String(r[6] || '0').replace(/\s/g, '').replace(',', '.')) || 0,
+        note: r[7] || ''
+      });
+    }
+  } else {
+    // Brak połączenia — lokalna historia tego urządzenia
+    source = 'historia lokalna tego urządzenia';
+    for (const h of (lsJ('history') || [])) {
+      const iso = parseRegDate(h.date);
+      if (!iso || iso < from || iso > to) continue;
+      if (h.person !== name) continue;
+      const s0 = toMin(h.start), e0 = toMin(h.end);
+      rows.push({
+        iso, obj: h.city || '', city: h.locCity || '', start: h.start, end: h.end,
+        min: (s0 != null && e0 != null && e0 > s0) ? e0 - s0 : 0,
+        cost: parseFloat(h.invoiceSum) || 0, note: h.invoices || ''
+      });
+    }
+  }
+  rows.sort((a, b) => a.iso.localeCompare(b.iso) || a.start.localeCompare(b.start));
+  return { rows, source };
+}
+
 // ---- Generate Delegacja ----
-function generateDelegacja() {
+async function generateDelegacja() {
   const empSel = document.getElementById('del-employee');
   const empName = empSel.value;
   const empPos  = empSel.selectedOptions[0]?.dataset.pos || 'Pracownik';
@@ -2358,6 +2414,33 @@ function generateDelegacja() {
   const orderDate  = document.getElementById('del-order-date').value;
 
   if (!dateFrom || !dateTo) { showToast('Uzupełnij daty wyjazdu i powrotu'); return; }
+  if (dateTo < dateFrom) { showToast('Data powrotu przed wyjazdem'); return; }
+
+  // Rzeczywisty czas pracy pracownika z rejestru w podanym zakresie
+  const emp = getEmployees().find(e => e.name === empName);
+  const empEmail = (emp && emp.email) || '';
+  showToast('⏳ Pobieram dane z rejestru…');
+  const log = await fetchWorkLog(empEmail, empName, dateFrom, dateTo);
+  const totalMin = log.rows.reduce((a, r) => a + r.min, 0);
+  const totalCost = log.rows.reduce((a, r) => a + r.cost, 0);
+  const fmtHM = m => `${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}`;
+  const fmtMoney = v => v.toFixed(2).replace('.', ',');
+  const logRows = log.rows.length
+    ? log.rows.map((r, i) => `<tr>
+        <td class="center">${i+1}</td><td>${fmtDocDate(r.iso)}</td><td>${esc(r.obj)}</td><td>${esc(r.city)}</td>
+        <td class="center">${esc(r.start)}</td><td class="center">${esc(r.end)}</td>
+        <td class="center">${fmtHM(r.min)}</td><td class="right">${r.cost ? fmtMoney(r.cost) : ''}</td>
+        <td>${esc(r.note)}</td></tr>`).join('')
+    : '<tr><td colspan="9" class="center">Brak wpisów w rejestrze w tym zakresie</td></tr>';
+  const logTable = `
+  <p style="font-size:13px;font-weight:700;margin-bottom:8px">Ewidencja czasu pracy (${log.source})</p>
+  <table>
+    <tr><th>Lp.</th><th>Data</th><th>Obiekt</th><th>Miasto</th><th>Wejście</th><th>Wyjście</th><th>Czas</th><th>Koszty PLN</th><th>Opis</th></tr>
+    ${logRows}
+    <tr><td colspan="6" style="text-align:right;font-weight:700">RAZEM:</td>
+      <td class="center" style="font-weight:700">${fmtHM(totalMin)}</td>
+      <td class="right" style="font-weight:700">${fmtMoney(totalCost)}</td><td></td></tr>
+  </table>`;
 
   const html = `
 <style>
@@ -2386,36 +2469,7 @@ function generateDelegacja() {
     <tr><th>Środek transportu</th><td>${esc(transport)}</td></tr>
   </table>
 
-  <p style="font-size:13px;font-weight:700;margin-bottom:8px">Rachunek Kosztów Podróży</p>
-  <table>
-    <tr>
-      <th>Lp.</th>
-      <th>Rodzaj kosztu</th>
-      <th>Kwota (PLN)</th>
-      <th>Uwagi</th>
-    </tr>
-    <tr><td class="center">1</td><td>Paliwo</td><td></td><td></td></tr>
-    <tr><td class="center">2</td><td>Noclegi</td><td></td><td></td></tr>
-    <tr><td class="center">3</td><td>Diety</td><td></td><td></td></tr>
-    <tr><td class="center">4</td><td>Inne</td><td></td><td></td></tr>
-    <tr>
-      <td colspan="2" style="text-align:right;font-weight:700">RAZEM:</td>
-      <td></td><td></td>
-    </tr>
-  </table>
-
-  <p style="font-size:13px;font-weight:700;margin-bottom:8px">Dodatkowe rozliczenie</p>
-  <table>
-    <tr>
-      <th>Opis</th>
-      <th>Kwota</th>
-      <th>Data</th>
-      <th>Dokument</th>
-    </tr>
-    <tr><td>&nbsp;</td><td></td><td></td><td></td></tr>
-    <tr><td>&nbsp;</td><td></td><td></td><td></td></tr>
-    <tr><td>&nbsp;</td><td></td><td></td><td></td></tr>
-  </table>
+  ${logTable}
 
   <table class="sig-row" style="margin-top:24px">
     <tr>
