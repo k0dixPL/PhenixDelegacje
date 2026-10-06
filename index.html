@@ -791,9 +791,12 @@ input::placeholder { color: var(--fg-dim); }
 
     <div class="topbar">
       <span class="topbar-logo">Phenix</span>
-      <div class="topbar-user" id="user-menu">
-        <div class="avatar" id="user-avatar">?</div>
-        <span id="user-name-label">—</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button id="btn-relogin" hidden style="font-size:11px;padding:4px 10px;border-radius:8px;background:var(--red-bg);color:var(--red);border:1px solid var(--red);cursor:pointer;font-family:var(--font-body)">🔒 Zaloguj</button>
+        <div class="topbar-user" id="user-menu">
+          <div class="avatar" id="user-avatar">?</div>
+          <span id="user-name-label">—</span>
+        </div>
       </div>
     </div>
 
@@ -995,8 +998,10 @@ function init() {
   if (hash && hash.includes('access_token')) {
     const params = new URLSearchParams(hash.substring(1));
     const token = params.get('access_token');
+    const expiresIn = parseInt(params.get('expires_in') || '3600', 10);
     if (token) {
       state.accessToken = token;
+      ls('token_expires', Date.now() + expiresIn * 1000);
       window.history.replaceState(null, '', window.location.pathname);
       fetchUserInfo(token);
       return;
@@ -1007,8 +1012,20 @@ function init() {
   const savedUser = lsJ('user_session');
   if (savedUser && savedUser.email && ALLOWED_EMAILS.includes(savedUser.email)) {
     state.user = savedUser;
-    state.accessToken = ls('access_token') || null;
+    const tokenExpires = parseInt(ls('token_expires') || '0', 10);
+    const tokenValid = tokenExpires > Date.now() + 60000; // 1 min buffer
+    if (tokenValid) {
+      state.accessToken = ls('access_token') || null;
+    } else {
+      // Token wygasł — wymuś ponowne logowanie
+      ls('access_token', null);
+      ls('token_expires', null);
+      state.accessToken = null;
+    }
     showMain();
+    if (!state.accessToken) {
+      showToast('🔒 Token wygasł — zaloguj się ponownie przyciskiem poniżej');
+    }
   } else {
     showLogin();
   }
@@ -1027,7 +1044,7 @@ document.getElementById('btn-save-config').addEventListener('click', () => {
 });
 
 // ---- Google Login ----
-document.getElementById('btn-google-login').addEventListener('click', () => {
+function startOAuth(prompt = 'select_account') {
   if (!state.clientId) { showToast('Najpierw wpisz Client ID'); return; }
   const redirectUri = window.location.origin + window.location.pathname;
   const url = `https://accounts.google.com/o/oauth2/v2/auth?` +
@@ -1035,9 +1052,12 @@ document.getElementById('btn-google-login').addEventListener('click', () => {
     `&redirect_uri=${encodeURIComponent(redirectUri)}` +
     `&response_type=token` +
     `&scope=${encodeURIComponent(SCOPES)}` +
-    `&prompt=select_account`;
+    `&prompt=${prompt}`;
   window.location.href = url;
-});
+}
+
+document.getElementById('btn-google-login').addEventListener('click', () => startOAuth('select_account'));
+document.getElementById('btn-relogin').addEventListener('click', () => startOAuth('none'));
 
 async function fetchUserInfo(token) {
   try {
@@ -1072,6 +1092,9 @@ function showMain() {
   const initials = (state.user.name || 'U').split(' ').map(w => w[0]).join('').substring(0,2).toUpperCase();
   document.getElementById('user-avatar').textContent = initials;
   document.getElementById('user-name-label').textContent = (state.user.name || '').split(' ')[0];
+
+  // Show re-login button if token is missing/expired
+  document.getElementById('btn-relogin').hidden = !!state.accessToken;
 
   // Date
   updateDateLabel();
@@ -1346,16 +1369,20 @@ async function appendToSheet(row) {
       body: JSON.stringify({ values })
     });
     if (!res.ok) {
-      const err = await res.json();
-      if (res.status === 401) {
-        ls('user_session', null);
+      let errMsg = res.status;
+      try { const err = await res.json(); errMsg = err.error?.message || res.status; } catch(e) {}
+      if (res.status === 401 || res.status === 403) {
         ls('access_token', null);
-        showToast('Sesja wygasła — zaloguj się ponownie');
-        setTimeout(() => { state.user = null; state.accessToken = null; showLogin(); }, 2000);
+        ls('token_expires', null);
+        state.accessToken = null;
+        document.getElementById('btn-relogin').hidden = false;
+        showToast('🔒 Token wygasł — kliknij "Zaloguj" w górze');
       } else {
-        showToast('⚠️ Błąd zapisu do arkusza: ' + (err.error?.message || res.status));
+        showToast('⚠️ Błąd zapisu: ' + errMsg);
       }
+      return false;
     }
+    return true;
   } catch(e) {
     showToast('⚠️ Brak połączenia — dane zapisane lokalnie');
   }
@@ -1438,7 +1465,13 @@ async function fetchLocations() {
       }
     } catch(e) { /* offline */ }
   }
-  return lsJ('locations_cache') || [];
+  // Migrate old string-array cache to new {name, city} format
+  const cached = lsJ('locations_cache') || [];
+  if (cached.length > 0 && typeof cached[0] === 'string') {
+    ls('locations_cache', null); // clear stale cache; will refresh from Sheets next time
+    return [];
+  }
+  return cached;
 }
 
 async function renderLocationChips() {
