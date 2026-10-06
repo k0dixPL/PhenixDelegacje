@@ -1,0 +1,1128 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>PhenixDelegacje</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+/* === DESIGN TOKENS ===
+   Layout: single-column mobile-first, full-height app shell
+   Color: dark industrial — navy slate base, electric amber accent, semantic greens/reds
+   Type: Inter utility + JetBrains Mono for times/data
+*/
+
+:root {
+  --bg:        #0E1117;
+  --surface:   #161B27;
+  --surface2:  #1E2535;
+  --border:    #2A3347;
+  --fg:        #E8EDF5;
+  --fg-muted:  #7A8BA8;
+  --fg-dim:    #4A5568;
+  --accent:    #F5A623;
+  --accent-bg: rgba(245,166,35,0.1);
+  --green:     #22C55E;
+  --green-bg:  rgba(34,197,94,0.1);
+  --red:       #EF4444;
+  --red-bg:    rgba(239,68,68,0.1);
+  --blue:      #60A5FA;
+
+  color-scheme: dark;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg:        #F0F4FA;
+    --surface:   #FFFFFF;
+    --surface2:  #F7F9FC;
+    --border:    #DDE3EE;
+    --fg:        #111827;
+    --fg-muted:  #5A6A82;
+    --fg-dim:    #9AA5B4;
+    --accent:    #D97B06;
+    --accent-bg: rgba(217,123,6,0.08);
+    --green:     #16A34A;
+    --green-bg:  rgba(22,163,74,0.08);
+    --red:       #DC2626;
+    --red-bg:    rgba(220,38,38,0.08);
+    --blue:      #2563EB;
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg:        #F0F4FA;
+  --surface:   #FFFFFF;
+  --surface2:  #F7F9FC;
+  --border:    #DDE3EE;
+  --fg:        #111827;
+  --fg-muted:  #5A6A82;
+  --fg-dim:    #9AA5B4;
+  --accent:    #D97B06;
+  --accent-bg: rgba(217,123,6,0.08);
+  --green:     #16A34A;
+  --green-bg:  rgba(22,163,74,0.08);
+  --red:       #DC2626;
+  --red-bg:    rgba(220,38,38,0.08);
+  --blue:      #2563EB;
+  color-scheme: light;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* === APP SHELL === */
+#app {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 0 16px;
+}
+
+/* === SCREEN MANAGEMENT === */
+.screen { display: none; flex-direction: column; flex: 1; }
+.screen.active { display: flex; }
+
+/* === TOP BAR === */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+  flex-shrink: 0;
+}
+
+.topbar-logo {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+
+.topbar-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.avatar {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  background: var(--accent-bg);
+  border: 1.5px solid var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: var(--accent);
+  flex-shrink: 0;
+}
+
+/* === LOGIN SCREEN === */
+#screen-login {
+  justify-content: center;
+  align-items: center;
+  gap: 32px;
+  text-align: center;
+}
+
+.login-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.login-logo .mark {
+  width: 72px; height: 72px;
+  background: var(--accent-bg);
+  border: 2px solid var(--accent);
+  border-radius: 20px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 32px;
+}
+
+.login-logo h1 {
+  font-size: 22px; font-weight: 700;
+  color: var(--fg);
+}
+
+.login-logo p {
+  font-size: 13px;
+  color: var(--fg-muted);
+  max-width: 280px;
+}
+
+.btn-google {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 24px;
+  font-size: 15px; font-weight: 600;
+  color: var(--fg);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  width: 100%; max-width: 300px;
+  justify-content: center;
+}
+.btn-google:hover { border-color: var(--accent); background: var(--accent-bg); }
+
+.btn-google svg { flex-shrink: 0; }
+
+/* === CITY BAR === */
+.city-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 20px;
+  flex-shrink: 0;
+}
+
+.city-bar-icon { color: var(--fg-muted); font-size: 16px; flex-shrink: 0; }
+
+.city-name {
+  font-size: 15px; font-weight: 600; color: var(--fg);
+  flex: 1;
+}
+
+.city-sub { font-size: 12px; color: var(--fg-muted); display: block; }
+
+.btn-city-edit {
+  background: none; border: none;
+  color: var(--fg-dim); cursor: pointer;
+  font-size: 12px; padding: 4px 8px;
+  border-radius: 6px; transition: color 0.15s;
+}
+.btn-city-edit:hover { color: var(--accent); }
+
+/* === STATUS CARD === */
+.status-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+  flex-shrink: 0;
+}
+
+.status-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.status-label {
+  font-size: 12px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--fg-dim);
+}
+
+.status-badge {
+  font-size: 11px; font-weight: 600;
+  padding: 3px 10px; border-radius: 20px;
+}
+.status-badge.idle {
+  background: var(--surface2);
+  color: var(--fg-muted);
+}
+.status-badge.active {
+  background: var(--green-bg);
+  color: var(--green);
+}
+
+.work-timer {
+  text-align: center;
+  padding: 8px 0 16px;
+}
+
+.timer-display {
+  font-family: var(--font-mono);
+  font-size: 48px; font-weight: 600;
+  color: var(--fg);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.timer-display.running { color: var(--green); }
+
+.timer-sub {
+  font-size: 12px; color: var(--fg-muted);
+  font-family: var(--font-mono);
+}
+
+/* === MAIN ACTION BUTTON === */
+.btn-action {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  width: 100%;
+  padding: 18px;
+  border-radius: 14px;
+  border: none;
+  font-size: 17px; font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.1s, opacity 0.15s;
+  letter-spacing: 0.02em;
+}
+.btn-action:active { transform: scale(0.98); }
+
+.btn-action.start {
+  background: var(--green);
+  color: #fff;
+}
+.btn-action.end {
+  background: var(--red);
+  color: #fff;
+}
+
+/* === INVOICE SECTION === */
+.section-title {
+  font-size: 12px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--fg-dim);
+  margin-bottom: 10px;
+}
+
+.invoice-form {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.invoice-inputs {
+  display: flex; gap: 10px; margin-bottom: 10px;
+}
+
+.inp-wrap {
+  display: flex; flex-direction: column; gap: 4px;
+}
+.inp-wrap label {
+  font-size: 11px; color: var(--fg-muted); font-weight: 500;
+}
+
+input[type="text"], input[type="number"] {
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 11px;
+  font-size: 14px; font-family: var(--font-body);
+  color: var(--fg);
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+}
+input[type="text"]:focus, input[type="number"]:focus {
+  border-color: var(--accent);
+}
+input[type="number"] { font-family: var(--font-mono); }
+input::placeholder { color: var(--fg-dim); }
+
+.inp-amount { width: 110px; flex-shrink: 0; }
+.inp-desc { flex: 1; }
+
+.btn-add-invoice {
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 16px;
+  font-size: 14px; font-weight: 700;
+  cursor: pointer;
+  width: 100%;
+  transition: opacity 0.15s;
+}
+.btn-add-invoice:hover { opacity: 0.88; }
+
+/* === INVOICE LIST === */
+.invoice-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+
+.invoice-item {
+  display: flex; align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  gap: 10px;
+}
+
+.invoice-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+.invoice-desc { flex: 1; font-size: 13px; color: var(--fg); }
+.invoice-amount {
+  font-family: var(--font-mono);
+  font-size: 14px; font-weight: 600;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.btn-del-invoice {
+  background: none; border: none;
+  color: var(--fg-dim); cursor: pointer;
+  font-size: 16px; padding: 2px;
+  border-radius: 4px; transition: color 0.15s;
+  line-height: 1; flex-shrink: 0;
+}
+.btn-del-invoice:hover { color: var(--red); }
+
+/* === HISTORY SECTION === */
+.history-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 20px;
+}
+
+.history-entry {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+
+.history-top {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.history-person {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 600;
+}
+
+.history-city {
+  font-size: 12px; color: var(--fg-muted);
+}
+
+.history-time {
+  font-family: var(--font-mono);
+  font-size: 12px; color: var(--fg-muted);
+}
+
+.history-bottom {
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+.history-hours {
+  font-family: var(--font-mono);
+  font-size: 13px; font-weight: 600; color: var(--fg);
+}
+
+.history-invoice-sum {
+  font-family: var(--font-mono);
+  font-size: 12px; color: var(--accent);
+}
+
+/* === EMPTY STATE === */
+.empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--fg-dim);
+}
+.empty-icon { font-size: 36px; margin-bottom: 10px; }
+.empty p { font-size: 13px; }
+
+/* === TOAST === */
+#toast {
+  position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 13px; font-weight: 500; color: var(--fg);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  z-index: 999;
+  white-space: nowrap;
+  transition: opacity 0.3s;
+}
+#toast[hidden] { display: none !important; }
+
+/* === CITY EDIT MODAL === */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  z-index: 100;
+}
+.modal-overlay[hidden] { display: none !important; }
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 22px;
+  width: 100%; max-width: 360px;
+}
+
+.modal h3 { font-size: 16px; font-weight: 700; margin-bottom: 14px; }
+.modal input { margin-bottom: 12px; }
+
+.modal-buttons { display: flex; gap: 8px; }
+
+.btn-secondary {
+  flex: 1; padding: 11px;
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px; font-weight: 600; color: var(--fg);
+  cursor: pointer;
+}
+
+.btn-primary {
+  flex: 1; padding: 11px;
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  font-size: 14px; font-weight: 700; color: #000;
+  cursor: pointer;
+}
+
+/* === SCROLLBAR === */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+/* === CONFIG OVERLAY === */
+#config-overlay {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+#config-overlay p {
+  font-size: 12px; color: var(--fg-muted);
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+#config-overlay input {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.config-note {
+  font-size: 11px; color: var(--fg-dim);
+  margin-top: 6px !important;
+  margin-bottom: 0 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-action, .btn-add-invoice { transition: none; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ LOGIN SCREEN ============ -->
+  <div id="screen-login" class="screen active">
+    <div class="login-logo">
+      <div class="mark">🦅</div>
+      <h1>PhenixDelegacje</h1>
+      <p>Rejestr czasu pracy i wydatków w delegacjach</p>
+    </div>
+    <button class="btn-google" id="btn-google-login">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2a10.34 10.34 0 0 0-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92a8.78 8.78 0 0 0 2.68-6.62Z"/><path fill="#34A853" d="M9 18a8.6 8.6 0 0 0 5.96-2.18l-2.91-2.26A5.43 5.43 0 0 1 9 14.52a5.42 5.42 0 0 1-5.1-3.73H.9v2.34A9 9 0 0 0 9 18Z"/><path fill="#FBBC05" d="M3.9 10.79A5.44 5.44 0 0 1 3.62 9c0-.62.11-1.23.28-1.79V4.87H.9A9 9 0 0 0 0 9a9 9 0 0 0 .9 4.13l3-2.34Z"/><path fill="#EA4335" d="M9 3.48a4.87 4.87 0 0 1 3.44 1.35l2.58-2.58A8.66 8.66 0 0 0 9 0 9 9 0 0 0 .9 4.87l3 2.34A5.42 5.42 0 0 1 9 3.48Z"/></svg>
+      Zaloguj przez Google
+    </button>
+    <div id="config-overlay">
+      <p><strong>Konfiguracja (jednorazowa)</strong><br>Wklej ID arkusza Google Sheets oraz Client ID z Google Cloud Console.</p>
+      <label style="font-size:11px;color:var(--fg-muted);display:block;margin-bottom:4px">ID arkusza Google Sheets</label>
+      <input type="text" id="cfg-sheet-id" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms">
+      <label style="font-size:11px;color:var(--fg-muted);display:block;margin-bottom:4px">Google OAuth Client ID</label>
+      <input type="text" id="cfg-client-id" placeholder="123456789-abc.apps.googleusercontent.com">
+      <button class="btn-primary" style="width:100%;padding:10px;margin-top:4px" id="btn-save-config">Zapisz konfigurację</button>
+      <p class="config-note">ℹ️ Instrukcja konfiguracji w załączonym pliku README</p>
+    </div>
+  </div>
+
+  <!-- ============ MAIN SCREEN ============ -->
+  <div id="screen-main" class="screen">
+
+    <div class="topbar">
+      <span class="topbar-logo">Phenix</span>
+      <div class="topbar-user" id="user-menu">
+        <div class="avatar" id="user-avatar">?</div>
+        <span id="user-name-label">—</span>
+      </div>
+    </div>
+
+    <!-- City bar -->
+    <div class="city-bar" id="city-bar">
+      <span class="city-bar-icon">📍</span>
+      <div>
+        <span class="city-name" id="city-label">Wykrywanie…</span>
+        <span class="city-sub" id="city-date"></span>
+      </div>
+      <button class="btn-city-edit" id="btn-edit-city">Zmień</button>
+    </div>
+
+    <!-- Status card -->
+    <div class="status-card">
+      <div class="status-row">
+        <span class="status-label">Czas pracy</span>
+        <span class="status-badge idle" id="status-badge">Nieaktywna</span>
+      </div>
+      <div class="work-timer">
+        <div class="timer-display" id="timer-display">00:00:00</div>
+        <div class="timer-sub" id="timer-sub">Naciśnij START aby rozpocząć</div>
+      </div>
+      <button class="btn-action start" id="btn-toggle-work">
+        <span id="btn-icon">▶</span>
+        <span id="btn-label">START PRACY</span>
+      </button>
+    </div>
+
+    <!-- Invoice form -->
+    <p class="section-title">Faktury do zwrotu</p>
+    <div class="invoice-form" id="invoice-form">
+      <div class="invoice-inputs">
+        <div class="inp-wrap inp-amount">
+          <label>Kwota (PLN)</label>
+          <input type="number" id="inp-amount" placeholder="0,00" step="0.01" min="0">
+        </div>
+        <div class="inp-wrap inp-desc">
+          <label>Opis</label>
+          <input type="text" id="inp-desc" placeholder="np. Paliwo, Hotel…">
+        </div>
+      </div>
+      <button class="btn-add-invoice" id="btn-add-invoice">+ Dodaj fakturę</button>
+    </div>
+
+    <!-- Invoice list -->
+    <div class="invoice-list" id="invoice-list"></div>
+
+    <!-- History -->
+    <p class="section-title">Ostatnie wpisy</p>
+    <div class="history-scroll" id="history-list">
+      <div class="empty">
+        <div class="empty-icon">📋</div>
+        <p>Brak wpisów. Zacznij od przycisku START.</p>
+      </div>
+    </div>
+
+  </div><!-- /screen-main -->
+
+</div><!-- /app -->
+
+<!-- City edit modal -->
+<div class="modal-overlay" id="city-modal" hidden>
+  <div class="modal">
+    <h3>📍 Zmień miasto</h3>
+    <input type="text" id="inp-city" placeholder="np. Warszawa">
+    <div class="modal-buttons">
+      <button class="btn-secondary" id="btn-city-cancel">Anuluj</button>
+      <button class="btn-primary" id="btn-city-confirm">Zapisz</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" hidden>✓ Zapisano</div>
+
+<script>
+// ============================================================
+//  PHENIX DELEGACJE — v1.0
+//  Google OAuth 2.0 + Sheets API v4
+// ============================================================
+
+const ALLOWED_EMAILS = [
+  'norejko.emil@gmail.com',
+  'ujekgrzegorz@gmail.com',
+  'garkowski@gmail.com',
+  'weteranzu@gmail.com',
+  'k0dix87@gmail.com'
+];
+
+const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
+const SHEET_REGISTER = 'Rejestr';
+
+// ---- State ----
+let state = {
+  user: null,
+  accessToken: null,
+  city: '',
+  workStart: null,
+  timerInterval: null,
+  todayInvoices: [],
+  sheetId: '',
+  clientId: ''
+};
+
+// ---- Local storage helpers ----
+function ls(key, val) {
+  try {
+    if (val === undefined) return localStorage.getItem(key);
+    if (val === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, typeof val === 'object' ? JSON.stringify(val) : val);
+  } catch(e) {}
+}
+function lsJ(key) {
+  try { return JSON.parse(ls(key)); } catch(e) { return null; }
+}
+
+// ---- Init ----
+function init() {
+  state.sheetId = ls('cfg_sheet_id') || '';
+  state.clientId = ls('cfg_client_id') || '';
+  state.city = ls('saved_city') || '';
+
+  if (state.sheetId) document.getElementById('cfg-sheet-id').value = state.sheetId;
+  if (state.clientId) document.getElementById('cfg-client-id').value = state.clientId;
+
+  // Check if returning from OAuth
+  const hash = window.location.hash;
+  if (hash && hash.includes('access_token')) {
+    const params = new URLSearchParams(hash.substring(1));
+    const token = params.get('access_token');
+    if (token) {
+      state.accessToken = token;
+      window.history.replaceState(null, '', window.location.pathname);
+      fetchUserInfo(token);
+      return;
+    }
+  }
+
+  // Check saved session
+  const savedUser = lsJ('user_session');
+  if (savedUser && savedUser.email && ALLOWED_EMAILS.includes(savedUser.email)) {
+    state.user = savedUser;
+    state.accessToken = ls('access_token') || null;
+    showMain();
+  } else {
+    showLogin();
+  }
+}
+
+// ---- Config save ----
+document.getElementById('btn-save-config').addEventListener('click', () => {
+  const sid = document.getElementById('cfg-sheet-id').value.trim();
+  const cid = document.getElementById('cfg-client-id').value.trim();
+  if (!sid || !cid) { showToast('Uzupełnij oba pola'); return; }
+  state.sheetId = sid;
+  state.clientId = cid;
+  ls('cfg_sheet_id', sid);
+  ls('cfg_client_id', cid);
+  showToast('✓ Konfiguracja zapisana');
+});
+
+// ---- Google Login ----
+document.getElementById('btn-google-login').addEventListener('click', () => {
+  if (!state.clientId) { showToast('Najpierw wpisz Client ID'); return; }
+  const redirectUri = window.location.origin + window.location.pathname;
+  const url = `https://accounts.google.com/o/oauth2/v2/auth?` +
+    `client_id=${encodeURIComponent(state.clientId)}` +
+    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+    `&response_type=token` +
+    `&scope=${encodeURIComponent(SCOPES)}` +
+    `&prompt=select_account`;
+  window.location.href = url;
+});
+
+async function fetchUserInfo(token) {
+  try {
+    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await res.json();
+    if (!ALLOWED_EMAILS.includes(data.email)) {
+      showToast('❌ Brak dostępu dla tego konta');
+      return;
+    }
+    state.user = { email: data.email, name: data.name, picture: data.picture };
+    ls('user_session', state.user);
+    ls('access_token', token);
+    showMain();
+  } catch(e) {
+    showToast('Błąd logowania. Spróbuj ponownie.');
+  }
+}
+
+// ---- Screens ----
+function showLogin() {
+  document.getElementById('screen-login').classList.add('active');
+  document.getElementById('screen-main').classList.remove('active');
+}
+
+function showMain() {
+  document.getElementById('screen-login').classList.remove('active');
+  document.getElementById('screen-main').classList.add('active');
+
+  // Set user info
+  const initials = (state.user.name || 'U').split(' ').map(w => w[0]).join('').substring(0,2).toUpperCase();
+  document.getElementById('user-avatar').textContent = initials;
+  document.getElementById('user-name-label').textContent = (state.user.name || '').split(' ')[0];
+
+  // Date
+  updateDateLabel();
+
+  // City
+  if (state.city) {
+    document.getElementById('city-label').textContent = state.city;
+  } else {
+    detectCity();
+  }
+
+  // Load today's invoices
+  state.todayInvoices = lsJ('today_invoices_' + todayKey()) || [];
+  renderInvoices();
+
+  // Load history
+  renderHistory();
+}
+
+function todayKey() {
+  return new Date().toISOString().substring(0, 10);
+}
+
+function updateDateLabel() {
+  const d = new Date();
+  const opts = { weekday: 'long', day: 'numeric', month: 'long' };
+  document.getElementById('city-date').textContent = d.toLocaleDateString('pl-PL', opts);
+}
+
+// ---- City detection ----
+async function detectCity() {
+  document.getElementById('city-label').textContent = 'Wykrywanie…';
+  if (!navigator.geolocation) {
+    document.getElementById('city-label').textContent = '— brak GPS —';
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    try {
+      const { latitude: lat, longitude: lon } = pos.coords;
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=pl`,
+        { headers: { 'User-Agent': 'PhenixDelegacje/1.0' } }
+      );
+      const data = await res.json();
+      const city = data.address?.city || data.address?.town || data.address?.village || data.address?.county || '';
+      if (city) {
+        state.city = city;
+        ls('saved_city', city);
+        document.getElementById('city-label').textContent = city;
+      } else {
+        document.getElementById('city-label').textContent = '— nieznane —';
+      }
+    } catch(e) {
+      document.getElementById('city-label').textContent = '— błąd GPS —';
+    }
+  }, () => {
+    document.getElementById('city-label').textContent = '— brak zgody GPS —';
+  });
+}
+
+// ---- City edit modal ----
+document.getElementById('btn-edit-city').addEventListener('click', () => {
+  document.getElementById('inp-city').value = state.city;
+  document.getElementById('city-modal').hidden = false;
+});
+document.getElementById('btn-city-cancel').addEventListener('click', () => {
+  document.getElementById('city-modal').hidden = true;
+});
+document.getElementById('btn-city-confirm').addEventListener('click', () => {
+  const c = document.getElementById('inp-city').value.trim();
+  if (c) {
+    state.city = c;
+    ls('saved_city', c);
+    document.getElementById('city-label').textContent = c;
+  }
+  document.getElementById('city-modal').hidden = true;
+});
+document.getElementById('inp-city').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btn-city-confirm').click();
+});
+
+// ---- Work timer ----
+document.getElementById('btn-toggle-work').addEventListener('click', () => {
+  if (!state.workStart) {
+    startWork();
+  } else {
+    endWork();
+  }
+});
+
+function startWork() {
+  if (!state.city || state.city.startsWith('—')) {
+    showToast('Najpierw ustaw miasto 📍');
+    return;
+  }
+  state.workStart = new Date();
+  ls('work_start', state.workStart.toISOString());
+
+  document.getElementById('status-badge').textContent = 'Aktywna';
+  document.getElementById('status-badge').className = 'status-badge active';
+  document.getElementById('btn-toggle-work').className = 'btn-action end';
+  document.getElementById('btn-icon').textContent = '■';
+  document.getElementById('btn-label').textContent = 'KONIEC PRACY';
+  document.getElementById('timer-display').classList.add('running');
+  document.getElementById('timer-sub').textContent = 'Pracujesz od ' + fmtTime(state.workStart);
+
+  state.timerInterval = setInterval(updateTimer, 1000);
+  updateTimer();
+}
+
+function updateTimer() {
+  if (!state.workStart) return;
+  const diff = Date.now() - state.workStart.getTime();
+  document.getElementById('timer-display').textContent = fmtDuration(diff);
+}
+
+async function endWork() {
+  const endTime = new Date();
+  clearInterval(state.timerInterval);
+  state.timerInterval = null;
+
+  const duration = endTime - state.workStart;
+  const row = {
+    person: state.user.name,
+    email: state.user.email,
+    date: fmtDate(state.workStart),
+    city: state.city,
+    start: fmtTime(state.workStart),
+    end: fmtTime(endTime),
+    hours: fmtDuration(duration),
+    invoiceSum: state.todayInvoices.reduce((s, i) => s + i.amount, 0).toFixed(2),
+    invoices: state.todayInvoices.map(i => `${i.amount.toFixed(2)} zł – ${i.desc}`).join(' | ')
+  };
+
+  // Reset UI
+  document.getElementById('status-badge').textContent = 'Nieaktywna';
+  document.getElementById('status-badge').className = 'status-badge idle';
+  document.getElementById('btn-toggle-work').className = 'btn-action start';
+  document.getElementById('btn-icon').textContent = '▶';
+  document.getElementById('btn-label').textContent = 'START PRACY';
+  document.getElementById('timer-display').textContent = '00:00:00';
+  document.getElementById('timer-display').classList.remove('running');
+  document.getElementById('timer-sub').textContent = 'Naciśnij START aby rozpocząć';
+  state.workStart = null;
+  ls('work_start', null);
+
+  // Save to sheets
+  await appendToSheet(row);
+
+  // Save to local history
+  saveHistory(row);
+  renderHistory();
+
+  // Clear today invoices
+  state.todayInvoices = [];
+  ls('today_invoices_' + todayKey(), []);
+  renderInvoices();
+
+  showToast('✓ Zapisano do arkusza');
+}
+
+// ---- Invoices ----
+document.getElementById('btn-add-invoice').addEventListener('click', addInvoice);
+document.getElementById('inp-desc').addEventListener('keydown', e => {
+  if (e.key === 'Enter') addInvoice();
+});
+
+function addInvoice() {
+  const amount = parseFloat(document.getElementById('inp-amount').value);
+  const desc = document.getElementById('inp-desc').value.trim();
+  if (!amount || amount <= 0) { showToast('Podaj kwotę'); return; }
+  if (!desc) { showToast('Podaj opis faktury'); return; }
+  state.todayInvoices.push({ amount, desc, id: Date.now() });
+  ls('today_invoices_' + todayKey(), state.todayInvoices);
+  document.getElementById('inp-amount').value = '';
+  document.getElementById('inp-desc').value = '';
+  renderInvoices();
+  showToast('✓ Faktura dodana');
+}
+
+function renderInvoices() {
+  const list = document.getElementById('invoice-list');
+  list.innerHTML = '';
+  state.todayInvoices.forEach(inv => {
+    const el = document.createElement('div');
+    el.className = 'invoice-item';
+    el.innerHTML = `
+      <div class="invoice-dot"></div>
+      <span class="invoice-desc">${esc(inv.desc)}</span>
+      <span class="invoice-amount">${inv.amount.toFixed(2)} zł</span>
+      <button class="btn-del-invoice" data-id="${inv.id}" title="Usuń">×</button>
+    `;
+    list.appendChild(el);
+  });
+  list.querySelectorAll('.btn-del-invoice').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.todayInvoices = state.todayInvoices.filter(i => i.id !== Number(btn.dataset.id));
+      ls('today_invoices_' + todayKey(), state.todayInvoices);
+      renderInvoices();
+    });
+  });
+}
+
+// ---- Local history ----
+function saveHistory(row) {
+  const hist = lsJ('history') || [];
+  hist.unshift(row);
+  ls('history', hist.slice(0, 50));
+}
+
+function renderHistory() {
+  const list = document.getElementById('history-list');
+  const hist = lsJ('history') || [];
+  if (!hist.length) {
+    list.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><p>Brak wpisów. Zacznij od przycisku START.</p></div>';
+    return;
+  }
+  list.innerHTML = hist.map(r => `
+    <div class="history-entry">
+      <div class="history-top">
+        <div class="history-person">
+          <div class="avatar" style="width:24px;height:24px;font-size:9px">${initials(r.person)}</div>
+          ${esc(r.person)}
+          <span class="history-city">· ${esc(r.city)}</span>
+        </div>
+        <span class="history-time">${esc(r.date)}</span>
+      </div>
+      <div class="history-bottom">
+        <span class="history-hours">${esc(r.start)} → ${esc(r.end)} (${esc(r.hours)})</span>
+        ${r.invoiceSum && r.invoiceSum !== '0.00' ? `<span class="history-invoice-sum">🧾 ${r.invoiceSum} zł</span>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+// ---- Google Sheets API ----
+async function appendToSheet(row) {
+  if (!state.sheetId || !state.accessToken) {
+    showToast('⚠️ Brak konfiguracji — dane tylko lokalnie');
+    return;
+  }
+  const values = [[
+    row.person,
+    row.email,
+    row.date,
+    row.city,
+    row.start,
+    row.end,
+    row.hours,
+    row.invoiceSum !== '0.00' ? row.invoiceSum : '',
+    row.invoices || ''
+  ]];
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_REGISTER)}!A:I:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${state.accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ values })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      if (res.status === 401) {
+        ls('user_session', null);
+        ls('access_token', null);
+        showToast('Sesja wygasła — zaloguj się ponownie');
+        setTimeout(() => { state.user = null; state.accessToken = null; showLogin(); }, 2000);
+      } else {
+        showToast('⚠️ Błąd zapisu do arkusza: ' + (err.error?.message || res.status));
+      }
+    }
+  } catch(e) {
+    showToast('⚠️ Brak połączenia — dane zapisane lokalnie');
+  }
+}
+
+// ---- Helpers ----
+function fmtTime(d) {
+  return d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+}
+function fmtDate(d) {
+  return d.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+function fmtDuration(ms) {
+  const s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function initials(name) {
+  return (name||'?').split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+}
+
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, 3000);
+}
+
+// ---- Restore work in progress ----
+const savedStart = ls('work_start');
+if (savedStart) {
+  const d = new Date(savedStart);
+  if (!isNaN(d.getTime()) && (Date.now() - d.getTime()) < 24 * 3600 * 1000) {
+    state.workStart = d;
+    setTimeout(() => {
+      if (state.user) {
+        document.getElementById('status-badge').textContent = 'Aktywna';
+        document.getElementById('status-badge').className = 'status-badge active';
+        document.getElementById('btn-toggle-work').className = 'btn-action end';
+        document.getElementById('btn-icon').textContent = '■';
+        document.getElementById('btn-label').textContent = 'KONIEC PRACY';
+        document.getElementById('timer-display').classList.add('running');
+        document.getElementById('timer-sub').textContent = 'Pracujesz od ' + fmtTime(d);
+        state.timerInterval = setInterval(updateTimer, 1000);
+        updateTimer();
+      }
+    }, 100);
+  }
+}
+
+// ---- Start ----
+init();
+</script>
+</body>
+</html>
+
+</body></html>
