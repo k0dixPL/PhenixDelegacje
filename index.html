@@ -1333,6 +1333,12 @@ function init() {
     }
   }
 
+  // Powrót z OAuth z błędem (np. prompt=none odrzucony) — wyczyść hash, nie zapętlaj
+  if (hash && /[#&]error=/.test(hash)) {
+    window.history.replaceState(null, '', window.location.pathname);
+    showToast('⚠️ Logowanie nieudane — spróbuj ponownie');
+  }
+
   // Check saved session
   const savedUser = lsJ('user_session');
   if (savedUser && savedUser.email && ALLOWED_EMAILS.includes(savedUser.email)) {
@@ -1377,12 +1383,13 @@ function startOAuth(prompt = 'select_account') {
     `&redirect_uri=${encodeURIComponent(redirectUri)}` +
     `&response_type=token` +
     `&scope=${encodeURIComponent(SCOPES)}` +
-    `&prompt=${prompt}`;
+    (prompt ? `&prompt=${prompt}` : '') +
+    `&login_hint=${encodeURIComponent((state.user && state.user.email) || '')}`;
   window.location.href = url;
 }
 
 document.getElementById('btn-google-login').addEventListener('click', () => startOAuth('select_account'));
-document.getElementById('btn-relogin').addEventListener('click', () => startOAuth('none'));
+document.getElementById('btn-relogin').addEventListener('click', () => startOAuth(''));
 
 async function fetchUserInfo(token) {
   try {
