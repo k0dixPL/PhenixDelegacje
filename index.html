@@ -982,6 +982,14 @@ input::placeholder { color: var(--fg-dim); }
           <input type="text" id="inp-desc" placeholder="np. Paliwo, Hotel…">
         </div>
       </div>
+      <div style="display:flex;align-items:center;gap:10px;margin:2px 0 10px;flex-wrap:wrap">
+        <label for="inp-photo" id="btn-photo" style="cursor:pointer;padding:8px 12px;border-radius:10px;background:var(--surface2);border:1.5px solid var(--border);color:var(--fg);font-size:13px">📷 Zdjęcie faktury</label>
+        <input type="file" id="inp-photo" accept="image/*" capture="environment" style="display:none">
+        <span id="photo-name" style="font-size:12px;color:var(--fg-muted)"></span>
+        <label style="font-size:12px;color:var(--fg-muted);display:flex;align-items:center;gap:6px;margin-left:auto">
+          <input type="checkbox" id="chk-mail" style="width:auto"> ✉ wyślij też mailem
+        </label>
+      </div>
       <button class="btn-add-invoice" id="btn-add-invoice">+ Dodaj fakturę</button>
     </div>
 
@@ -1267,7 +1275,7 @@ const ALLOWED_EMAILS = [
   'k0dix87@gmail.com'
 ];
 
-const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
+const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
 const SHEET_REGISTER = 'Rejestr';
 
 // ---- State ----
@@ -1327,6 +1335,7 @@ function init() {
     if (token) {
       state.accessToken = token;
       ls('token_expires', Date.now() + expiresIn * 1000);
+      ls('scope_ver', '2');
       window.history.replaceState(null, '', window.location.pathname);
       fetchUserInfo(token);
       return;
@@ -1344,7 +1353,7 @@ function init() {
   if (savedUser && savedUser.email && ALLOWED_EMAILS.includes(savedUser.email)) {
     state.user = savedUser;
     const tokenExpires = parseInt(ls('token_expires') || '0', 10);
-    const tokenValid = tokenExpires > Date.now() + 60000; // 1 min buffer
+    const tokenValid = tokenExpires > Date.now() + 60000 && ls('scope_ver') === '2'; // 1 min buffer + nowe uprawnienia (Dysk/Gmail)
     if (tokenValid) {
       state.accessToken = ls('access_token') || null;
     } else {
@@ -1447,6 +1456,8 @@ function showMain() {
 
   // Load history
   renderHistory();
+
+  flushQueue();
 
   // Bottom nav
   document.getElementById('bottom-nav').classList.add('visible');
@@ -1613,7 +1624,8 @@ async function endWork() {
     end: fmtTime(endTime),
     hours: fmtDuration(duration),
     invoiceSum: state.todayInvoices.reduce((s, i) => s + i.amount, 0).toFixed(2),
-    invoices: state.todayInvoices.map(i => `${i.amount.toFixed(2)} zł – ${i.desc}`).join(' | ')
+    invoices: state.todayInvoices.map(i => `${i.amount.toFixed(2)} zł – ${i.desc}`).join(' | '),
+    invoiceLinks: state.todayInvoices.map(i => i.link).filter(Boolean).join(' | ')
   };
 
   // Reset UI
@@ -1652,18 +1664,197 @@ document.getElementById('inp-desc').addEventListener('keydown', e => {
   if (e.key === 'Enter') addInvoice();
 });
 
-function addInvoice() {
+let _addingInvoice = false;
+async function addInvoice() {
+  if (_addingInvoice) return;
   const amount = parseFloat(document.getElementById('inp-amount').value);
   const desc = document.getElementById('inp-desc').value.trim();
   if (!amount || amount <= 0) { showToast('Podaj kwotę'); return; }
   if (!desc) { showToast('Podaj opis faktury'); return; }
-  state.todayInvoices.push({ amount, desc, id: Date.now() });
+  const photo = document.getElementById('inp-photo').files[0];
+  const wantMail = document.getElementById('chk-mail').checked;
+  const inv = { amount, desc, id: Date.now() };
+
+  if (photo) {
+    _addingInvoice = true;
+    document.getElementById('btn-add-invoice').disabled = true;
+    showToast('⏳ Przetwarzam zdjęcie…');
+    try {
+      const pdf = await photoToPdf(photo);
+      const fname = `${new Date().toISOString().substring(0,10)}_${(state.user.name||'').replace(/\s+/g,'_')}_${amount.toFixed(2)}_${desc}`
+        .replace(/[\\/:*?"<>|]+/g, '-').substring(0, 120) + '.pdf';
+      let mailTo = '';
+      if (wantMail) {
+        mailTo = ls('cfg_accountant_email') || '';
+        if (!mailTo) {
+          mailTo = (prompt('Adres e-mail księgowej (zapamiętam na tym telefonie):') || '').trim();
+          if (mailTo) ls('cfg_accountant_email', mailTo);
+        }
+      }
+      const item = { id: inv.id, name: fname, blob: pdf, mailTo, subject: `Faktura: ${desc} — ${amount.toFixed(2)} zł (${state.user.name})` };
+      const link = await uploadInvoice(item);
+      if (link) { inv.link = link; showToast('✓ Faktura na Dysku' + (mailTo ? ' + mail' : '')); }
+      else { await queuePut(item); showToast('📥 Zdjęcie w kolejce — wyślę, gdy wróci zasięg/logowanie'); }
+    } catch (e) {
+      console.error(e);
+      showToast('⚠️ Nie udało się przetworzyć zdjęcia');
+    }
+    document.getElementById('btn-add-invoice').disabled = false;
+    _addingInvoice = false;
+    document.getElementById('inp-photo').value = '';
+    document.getElementById('photo-name').textContent = '';
+  } else {
+    showToast('✓ Faktura dodana');
+  }
+
+  state.todayInvoices.push(inv);
   ls('today_invoices_' + todayKey(), state.todayInvoices);
   document.getElementById('inp-amount').value = '';
   document.getElementById('inp-desc').value = '';
   renderInvoices();
-  showToast('✓ Faktura dodana');
 }
+
+document.getElementById('inp-photo').addEventListener('change', e => {
+  const f = e.target.files[0];
+  document.getElementById('photo-name').textContent = f ? '✓ ' + f.name.substring(0, 24) : '';
+});
+
+// ---- Zdjęcie -> PDF (bez bibliotek: JPEG osadzony w jednostronicowym PDF) ----
+async function photoToPdf(file) {
+  let bmp;
+  try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+  catch (e) { bmp = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = URL.createObjectURL(file); }); }
+  const W0 = bmp.width, H0 = bmp.height;
+  const k = Math.min(1, 1800 / Math.max(W0, H0));
+  const w = Math.round(W0 * k), h = Math.round(H0 * k);
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, w, h); cx.drawImage(bmp, 0, 0, w, h);
+  const jpg = new Uint8Array(await (await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.78))).arrayBuffer());
+
+  // strona A4, obraz dopasowany z marginesem
+  const PW = 595, PH = 842, M = 24;
+  const sc = Math.min((PW - 2*M) / w, (PH - 2*M) / h);
+  const dw = (w * sc).toFixed(2), dh = (h * sc).toFixed(2);
+  const dx = ((PW - w * sc) / 2).toFixed(2), dy = (PH - M - h * sc).toFixed(2);
+  const enc = new TextEncoder();
+  const content = `q ${dw} 0 0 ${dh} ${dx} ${dy} cm /Im0 Do Q`;
+  const parts = []; const offs = []; let len = 0;
+  const push = d => { const b = typeof d === 'string' ? enc.encode(d) : d; parts.push(b); len += b.length; };
+  push('%PDF-1.4\n');
+  const obj = (n, body) => { offs[n] = len; push(`${n} 0 obj\n`); body(); push('\nendobj\n'); };
+  obj(1, () => push('<< /Type /Catalog /Pages 2 0 R >>'));
+  obj(2, () => push('<< /Type /Pages /Kids [3 0 R] /Count 1 >>'));
+  obj(3, () => push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PW} ${PH}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`));
+  obj(4, () => { push(`<< /Type /XObject /Subtype /Image /Width ${w} /Height ${h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpg.length} >>\nstream\n`); push(jpg); push('\nendstream'); });
+  obj(5, () => push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`));
+  const xref = len;
+  push('xref\n0 6\n0000000000 65535 f \n');
+  for (let i = 1; i <= 5; i++) push(String(offs[i]).padStart(10, '0') + ' 00000 n \n');
+  push(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
+  return new Blob(parts, { type: 'application/pdf' });
+}
+
+// ---- Dysk Google ----
+const DRIVE_FOLDER_NAME = 'PhenixDelegacje - Faktury';
+const DRIVE_FOLDER_ID = ''; // opcjonalnie: wpisz na stałe ID wspólnego folderu
+
+async function ensureFolder() {
+  const cached = ls('drive_folder_id') || DRIVE_FOLDER_ID;
+  if (cached) return cached;
+  const h = { Authorization: `Bearer ${state.accessToken}` };
+  const q = encodeURIComponent(`name='${DRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+  const r = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&supportsAllDrives=true&includeItemsFromAllDrives=true`, { headers: h });
+  if (!r.ok) throw new Error('drive-search-' + r.status);
+  const found = ((await r.json()).files || [])[0];
+  let id = found && found.id;
+  if (!id) {
+    const c = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
+      method: 'POST', headers: { ...h, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: DRIVE_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' })
+    });
+    if (!c.ok) throw new Error('drive-create-' + c.status);
+    id = (await c.json()).id;
+  }
+  ls('drive_folder_id', id);
+  return id;
+}
+
+// Zwraca link do pliku albo null (offline / brak tokenu / błąd) — wtedy wpada do kolejki
+async function uploadInvoice(item) {
+  if (!state.accessToken || !navigator.onLine) return null;
+  try {
+    const folder = await ensureFolder();
+    const boundary = 'pxd' + Date.now();
+    const meta = JSON.stringify({ name: item.name, parents: [folder], mimeType: 'application/pdf' });
+    const body = new Blob([
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n`,
+      `--${boundary}\r\nContent-Type: application/pdf\r\n\r\n`, item.blob, `\r\n--${boundary}--`
+    ]);
+    const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink&supportsAllDrives=true', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${state.accessToken}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+      body
+    });
+    if (r.status === 401 || r.status === 403) {
+      document.getElementById('btn-relogin').hidden = false;
+      showToast('🔒 Zaloguj się ponownie (nowe uprawnienia do Dysku)');
+      return null;
+    }
+    if (!r.ok) return null;
+    const link = (await r.json()).webViewLink || '';
+    if (item.mailTo) { try { await sendInvoiceMail(item, link); } catch(e) { console.error(e); } }
+    return link || null;
+  } catch (e) { console.error(e); return null; }
+}
+
+// ---- Mail (opcjonalnie) — Gmail API, z konta zalogowanego pracownika ----
+async function blobToB64(blob) {
+  return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(',')[1]); fr.readAsDataURL(blob); });
+}
+async function sendInvoiceMail(item, link) {
+  const b64 = (await blobToB64(item.blob)).replace(/(.{76})/g, '$1\r\n');
+  const subj = '=?UTF-8?B?' + btoa(unescape(encodeURIComponent(item.subject))) + '?=';
+  const text = btoa(unescape(encodeURIComponent(`${item.subject}\n\nFaktura w załączniku.${link ? '\nDysk: ' + link : ''}\n\nPhenix-IT / PhenixDelegacje`)));
+  const mime = [
+    `To: ${item.mailTo}`, `Subject: ${subj}`, 'MIME-Version: 1.0', 'Content-Type: multipart/mixed; boundary="pxdmail"', '',
+    '--pxdmail', 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', text, '',
+    '--pxdmail', `Content-Type: application/pdf; name="${item.name.replace(/[^\x20-\x7e]/g, '_')}"`, 'Content-Transfer-Encoding: base64',
+    `Content-Disposition: attachment; filename="${item.name.replace(/[^\x20-\x7e]/g, '_')}"`, '', b64, '', '--pxdmail--'
+  ].join('\r\n');
+  const raw = btoa(mime).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const r = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST', headers: { Authorization: `Bearer ${state.accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ raw })
+  });
+  if (!r.ok) throw new Error('mail-' + r.status);
+}
+
+// ---- Kolejka offline (IndexedDB) ----
+function idb() {
+  return new Promise((res, rej) => {
+    const rq = indexedDB.open('phenix', 1);
+    rq.onupgradeneeded = () => rq.result.createObjectStore('uploads', { keyPath: 'id' });
+    rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error);
+  });
+}
+async function queuePut(item) {
+  try { const db = await idb(); await new Promise((res, rej) => { const t = db.transaction('uploads', 'readwrite'); t.objectStore('uploads').put(item); t.oncomplete = res; t.onerror = rej; }); } catch(e) {}
+}
+async function flushQueue() {
+  if (!state.accessToken || !navigator.onLine) return;
+  try {
+    const db = await idb();
+    const items = await new Promise(res => { const rq = db.transaction('uploads').objectStore('uploads').getAll(); rq.onsuccess = () => res(rq.result || []); rq.onerror = () => res([]); });
+    for (const it of items) {
+      const link = await uploadInvoice(it);
+      if (link) {
+        await new Promise(res => { const t = db.transaction('uploads', 'readwrite'); t.objectStore('uploads').delete(it.id); t.oncomplete = res; });
+        showToast('✓ Wysłano zaległą fakturę na Dysk');
+      } else break;
+    }
+  } catch(e) {}
+}
+window.addEventListener('online', flushQueue);
 
 function renderInvoices() {
   const list = document.getElementById('invoice-list');
@@ -1741,7 +1932,7 @@ async function appendToSheet(row) {
     showToast('⚠️ Brak konfiguracji — dane tylko lokalnie');
     return;
   }
-  // Kolejność kolumn: Data | Obiekt | Miasto | Godz. wejścia | Godz. wyjścia | Email | Koszty PLN | Nazwa (opis faktur)
+  // Kolejność kolumn: Data | Obiekt | Miasto | Godz. wejścia | Godz. wyjścia | Email | Koszty PLN | Nazwa (opis faktur) | Faktura (link)
   const values = [[
     row.date,
     row.city,
@@ -1750,10 +1941,11 @@ async function appendToSheet(row) {
     row.end,
     row.email,
     row.invoiceSum !== '0.00' ? row.invoiceSum : '',
-    row.invoices || ''
+    row.invoices || '',
+    row.invoiceLinks || ''
   ]];
   try {
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_REGISTER)}!A:H:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_REGISTER)}!A:I:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
     const res = await fetch(url, {
       method: 'POST',
       headers: {
@@ -2381,7 +2573,7 @@ async function generateReport() {
   let raw = null;
   if (state.sheetId && state.accessToken) {
     try {
-      const url = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_REGISTER)}!A:H`;
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_REGISTER)}!A:I`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${state.accessToken}` } });
       if (res.ok) raw = ((await res.json()).values || []);
     } catch(e) {}
@@ -2488,7 +2680,7 @@ async function fetchWorkLog(email, name, from, to, prefetched) {
   let raw = prefetched || null, source = 'rejestr Google Sheets';
   if (!raw && state.sheetId && state.accessToken) {
     try {
-      const url = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_REGISTER)}!A:H`;
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${state.sheetId}/values/${encodeURIComponent(SHEET_REGISTER)}!A:I`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${state.accessToken}` } });
       if (res.ok) raw = ((await res.json()).values || []);
     } catch(e) {}
